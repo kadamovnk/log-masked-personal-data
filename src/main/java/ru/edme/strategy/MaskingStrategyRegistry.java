@@ -15,7 +15,6 @@ public class MaskingStrategyRegistry {
     public void init() {
         register(String.class, new StringMaskingStrategy());
         register(LocalDate.class, new LocalDateMaskingStrategy());
-        // Register other strategies
     }
     
     public <T> void register(Class<T> type, MaskingStrategy<T> strategy) {

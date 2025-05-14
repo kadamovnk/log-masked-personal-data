@@ -12,7 +12,6 @@ public class StringMaskingStrategy implements MaskingStrategy<String> {
         
         String masked = value;
         
-        // Apply all masking patterns sequentially
         for (MaskingPattern pattern : MaskingPattern.values()) {
             masked = pattern.getMaskedValue(masked);
         }

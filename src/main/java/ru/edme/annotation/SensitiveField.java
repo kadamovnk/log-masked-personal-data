@@ -13,8 +13,4 @@ public @interface SensitiveField {
     MaskingPattern[] patterns() default {};
     String customRegex() default "";
     String customReplacement() default "";
-    boolean keepFirstChars() default false;
-    int firstCharsToKeep() default 0;
-    boolean keepLastChars() default false;
-    int lastCharsToKeep() default 0;
 }
