@@ -1,4 +1,4 @@
-package ru.edme.other;
+package ru.edme.demo;
 
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -9,8 +9,8 @@ import java.time.LocalDate;
 
 @Configuration
 @RequiredArgsConstructor
-public class TestApp {
-    private final PersonService personService;
+public class Demo {
+    private final Logging logging;
     
     @PostConstruct
     public void build() {
@@ -31,7 +31,7 @@ public class TestApp {
         person.setInn("607080901000");
         person.setSnils("314-565-256-20");
         
-        personService.log(person);
+        logging.log(person);
         
         System.exit(0);
     }

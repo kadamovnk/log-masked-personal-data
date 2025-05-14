@@ -1,4 +1,4 @@
-package ru.edme.other;
+package ru.edme.demo;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -9,7 +9,7 @@ import java.time.format.DateTimeFormatter;
 
 @Service
 @Slf4j
-public class PersonService {
+public class Logging {
     
     @LogMasked
     public void log(Person person) {
