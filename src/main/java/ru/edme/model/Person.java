@@ -7,25 +7,26 @@ import java.time.LocalDate;
 
 @Data
 public class Person {
-    @SensitiveField
+    
+    @SensitiveField(patterns = MaskingPattern.FULL_NAME)
     private String firstName;
     
-    @SensitiveField
+    @SensitiveField(patterns = MaskingPattern.FULL_NAME)
     private String lastName;
     
-    @SensitiveField
+    @SensitiveField(patterns = MaskingPattern.FULL_NAME)
     private String middleName;
     
     @SensitiveField
     private LocalDate birthDate;
     
-    @SensitiveField
+    @SensitiveField(patterns = MaskingPattern.PASSPORT_SERIES)
     private String passportSeries;
     
-    @SensitiveField
+    @SensitiveField(patterns = MaskingPattern.PASSPORT_NUMBER)
     private String passportNumber;
     
-    @SensitiveField
+    @SensitiveField(patterns = MaskingPattern.PASSPORT_ISSUED_BY)
     private String passportIssuedBy;
     
     @SensitiveField
@@ -34,22 +35,24 @@ public class Person {
     @SensitiveField
     private LocalDate passportExpiryDate;
     
-    @SensitiveField
+    @SensitiveField(patterns = MaskingPattern.SUBDIVISION_CODE)
     private String passportSubdivisionCode;
     
-    @SensitiveField
+    @SensitiveField(patterns = MaskingPattern.ADDRESS)
     private String address;
     
-    @SensitiveField
+    @SensitiveField(patterns = MaskingPattern.PHONE)
     private String phone;
     
-    @SensitiveField
+    @SensitiveField(patterns = MaskingPattern.EMAIL)
     private String email;
     
-    @SensitiveField
+    @SensitiveField(patterns = {MaskingPattern.INN_10_DIGITS, MaskingPattern.INN_12_DIGITS})
     private String inn;
     
-    @SensitiveField
+    @SensitiveField(patterns = MaskingPattern.SNILS)
     private String snils;
+    
+    @SensitiveField(patterns = {MaskingPattern.DATE_DD_MM_YYYY, MaskingPattern.DATE_YYYY_MM_DD})
+    private String stringDate;
 }
-

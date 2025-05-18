@@ -24,9 +24,12 @@ public class Logging {
         log.info("Passport Expiry Date: {}", person.getPassportExpiryDate());
         log.info("Passport Subdivision Code: {}", person.getPassportSubdivisionCode());
         log.info("Address: {}", person.getAddress());
-        log.info("Phone: {}", person.getPhone());
-        log.info("Email: {}", person.getEmail());
-        log.info("INN: {}", person.getInn());
-        log.info("SNILS: {}", person.getSnils());
+        log.warn("Phone: {}", person.getPhone());
+        log.error("Email: {}", person.getEmail());
+        log.warn("INN: {}", person.getInn());
+        log.error("SNILS: {}", person.getSnils());
+        log.info("String Date: {}", person.getStringDate());
+        System.out.println("First Name: " + person.getFirstName());
+        System.out.println("Last Name: " + person);
     }
 }

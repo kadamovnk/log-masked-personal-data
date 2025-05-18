@@ -7,62 +7,99 @@ import ru.edme.annotation.SensitiveField;
 import ru.edme.model.MaskingPattern;
 import ru.edme.strategy.MaskingStrategy;
 import ru.edme.strategy.MaskingStrategyRegistry;
+import ru.edme.strategy.StringMaskingStrategy;
 
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Service for masking sensitive data in objects and strings using registered masking strategies.
+ * Handles masking based on annotation configuration or type-based strategies.
+ */
 @Service
 @RequiredArgsConstructor
 public class MaskingService {
     private final MaskingStrategyRegistry strategyRegistry;
     
+    // Cache: Class -> List of Sensitive Fields
+    private static final Map<Class<?>, List<Field>> sensitiveFieldCache = new ConcurrentHashMap<>();
+    // Cache: Field -> SensitiveField annotation
+    private static final Map<Field, SensitiveField> annotationCache = new ConcurrentHashMap<>();
+    
+    /**
+     * Apply masking to a value based on its type using the appropriate strategy.
+     * @param value the value to mask
+     * @return masked value
+     */
     public <T> T maskValue(T value) {
         if (value == null) return null;
         
         @SuppressWarnings("unchecked")
-        MaskingStrategy<T> strategy = (MaskingStrategy<T>)
-                strategyRegistry.getStrategy(value.getClass());
-        
+        MaskingStrategy<T> strategy = (MaskingStrategy<T>) strategyRegistry.getStrategy(value.getClass());
         return strategy.mask(value);
     }
     
+    /**
+     * Mask a value based on the SensitiveField annotation's configuration.
+     * @param value the value to mask
+     * @param annotation the annotation specifying masking patterns
+     * @return masked value
+     */
+    @SuppressWarnings("unchecked")
     public <T> T maskValue(T value, SensitiveField annotation) {
-        if (value == null || !(value instanceof String)) {
-            return maskValue(value);
-        }
+        if (value == null) return null;
         
-        String stringValue = (String) value;
-        
-        // Apply specific masking patterns if provided
-        if (annotation.patterns().length > 0) {
-            for (MaskingPattern pattern : annotation.patterns()) {
-                stringValue = pattern.getMaskedValue(stringValue);
+        if (value instanceof String && annotation != null) {
+            String stringValue = (String) value;
+            // Only apply specific patterns if provided
+            MaskingPattern[] patterns = annotation.patterns();
+            if (patterns.length > 0) {
+                StringMaskingStrategy stringStrategy = (StringMaskingStrategy) strategyRegistry.getStrategy(String.class);
+                return (T) stringStrategy.mask(stringValue, patterns);
             }
-        } else if (!annotation.customRegex().isEmpty()) {
-            stringValue = stringValue.replaceAll(
-                    annotation.customRegex(),
-                    annotation.customReplacement().isEmpty() ? "***" : annotation.customReplacement()
-            );
-        } else {
-            stringValue = (String) maskValue((T) stringValue);
         }
         
-        @SuppressWarnings("unchecked")
-        T result = (T) stringValue;
-        return result;
+        return maskValue(value);
     }
     
-    public void maskSensitiveFields(Object obj) {
-        if (obj == null) return;
+    /**
+     * Process an object, masking all fields with @SensitiveField annotations.
+     * @param object the object to process
+     * @return the object with masked sensitive fields
+     */
+    public <T> T maskSensitiveFields(T object) {
+        if (object == null) return null;
+        Class<?> clazz = object.getClass();
         
-        ReflectionUtils.doWithFields(obj.getClass(), field -> {
-            try {
-                field.setAccessible(true);
-                Object value = field.get(obj);
-                if (value != null) {
-                    SensitiveField annotation = field.getAnnotation(SensitiveField.class);
-                    field.set(obj, maskValue(value, annotation));
+        // Get or compute sensitive fields for this class
+        List<Field> sensitiveFields = sensitiveFieldCache.computeIfAbsent(clazz, c -> {
+            List<Field> fields = new ArrayList<>();
+            ReflectionUtils.doWithFields(c, field -> {
+                if (field.isAnnotationPresent(SensitiveField.class)) {
+                    field.setAccessible(true);
+                    fields.add(field);
+                    // Cache annotation for this field
+                    annotationCache.put(field, field.getAnnotation(SensitiveField.class));
                 }
-            } catch (Exception e) {
-                // exception handling or logging will be added in the future
+            });
+            return fields;
+        });
+        
+        for (Field field : sensitiveFields) {
+            try {
+                Object value = field.get(object);
+                if (value != null) {
+                    SensitiveField annotation = annotationCache.get(field);
+                    Object maskedValue = maskValue(value, annotation);
+                    field.set(object, maskedValue);
+                }
+            } catch (IllegalAccessException e) {
+                throw new RuntimeException("Error processing sensitive field: " + field.getName(), e);
             }
-        }, field -> field.isAnnotationPresent(SensitiveField.class));
+        }
+        return object;
     }
 }
