@@ -1,13 +1,13 @@
-package ru.edme.service;
+package ru.edme.aop.logger.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ReflectionUtils;
-import ru.edme.annotation.SensitiveField;
-import ru.edme.model.MaskingPattern;
-import ru.edme.strategy.MaskingStrategy;
-import ru.edme.strategy.MaskingStrategyRegistry;
-import ru.edme.strategy.StringMaskingStrategy;
+import ru.edme.aop.logger.annotation.SensitiveField;
+import ru.edme.pattern.MaskingPattern;
+import ru.edme.aop.logger.strategy.MaskingStrategy;
+import ru.edme.aop.logger.strategy.MaskingStrategyRegistry;
+import ru.edme.aop.logger.strategy.StringMaskingStrategy;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;

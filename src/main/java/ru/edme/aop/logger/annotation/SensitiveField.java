@@ -1,6 +1,6 @@
-package ru.edme.annotation;
+package ru.edme.aop.logger.annotation;
 
-import ru.edme.model.MaskingPattern;
+import ru.edme.pattern.MaskingPattern;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

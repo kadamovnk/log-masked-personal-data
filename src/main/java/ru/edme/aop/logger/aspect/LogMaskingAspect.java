@@ -1,11 +1,11 @@
-package ru.edme.aspect;
+package ru.edme.aop.logger.aspect;
 
 import lombok.RequiredArgsConstructor;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.stereotype.Component;
-import ru.edme.service.MaskingService;
+import ru.edme.aop.logger.service.MaskingService;
 
 @Aspect
 @Component
@@ -13,9 +13,9 @@ import ru.edme.service.MaskingService;
 public class LogMaskingAspect {
     private final MaskingService maskingService;
     
-    @Around("@annotation(ru.edme.annotation.LogMasked)")
+    @Around("@annotation(ru.edme.aop.logger.annotation.LogMasked)")
     public Object maskMethodArgs(ProceedingJoinPoint joinPoint) throws Throwable {
-        var args = joinPoint.getArgs();
+        Object[] args = joinPoint.getArgs();
         
         for (int i = 0; i < args.length; i++) {
             Object arg = args[i];

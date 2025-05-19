@@ -1,7 +1,7 @@
-package ru.edme.strategy;
+package ru.edme.aop.logger.strategy;
 
 import org.springframework.stereotype.Component;
-import ru.edme.model.MaskingPattern;
+import ru.edme.pattern.MaskingPattern;
 
 /**
  * Masking strategy for String values. Applies one or more MaskingPattern rules to the input string.
@@ -31,11 +31,11 @@ public class StringMaskingStrategy implements MaskingStrategy<String> {
         String result = value;
         if (patterns != null && patterns.length > 0) {
             for (MaskingPattern pattern : patterns) {
-                result = pattern.getMaskedValue(result);
+                result = pattern.applyTo(result);
             }
         } else {
             for (MaskingPattern pattern : MaskingPattern.values()) {
-                result = pattern.getMaskedValue(result);
+                result = pattern.applyTo(result);
             }
         }
         return result;

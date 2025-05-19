@@ -1,7 +1,8 @@
 package ru.edme.model;
 
 import lombok.Data;
-import ru.edme.annotation.SensitiveField;
+import ru.edme.aop.logger.annotation.SensitiveField;
+import ru.edme.pattern.MaskingPattern;
 
 import java.time.LocalDate;
 
@@ -17,7 +18,7 @@ public class Person {
     @SensitiveField(patterns = MaskingPattern.FULL_NAME)
     private String middleName;
     
-    @SensitiveField
+    @SensitiveField(patterns = MaskingPattern.DATE_YYYY_MM_DD)
     private LocalDate birthDate;
     
     @SensitiveField(patterns = MaskingPattern.PASSPORT_SERIES)
@@ -29,10 +30,10 @@ public class Person {
     @SensitiveField(patterns = MaskingPattern.PASSPORT_ISSUED_BY)
     private String passportIssuedBy;
     
-    @SensitiveField
+    @SensitiveField(patterns = MaskingPattern.DATE_YYYY_MM_DD)
     private LocalDate passportIssuedDate;
     
-    @SensitiveField
+    @SensitiveField(patterns = MaskingPattern.DATE_YYYY_MM_DD)
     private LocalDate passportExpiryDate;
     
     @SensitiveField(patterns = MaskingPattern.SUBDIVISION_CODE)
