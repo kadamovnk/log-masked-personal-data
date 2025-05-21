@@ -6,6 +6,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public enum MaskingPattern {
+    NO_MASK("(.*)", "$1"),
     EMAIL("([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+)", "***@masked.com"),
     PHONE("(\\+7\\(\\d{3}\\))\\d{3}-\\d{2}-(\\d{2})", "$1***-**-$2"),
     SNILS("(\\d{3})-\\d{3}-\\d{3}-\\d{2}", "$1-***-***-**"),
@@ -23,8 +24,9 @@ public enum MaskingPattern {
         String address = matchResult.group(1);
         Pattern addressPattern = Pattern.compile(
                 "(?<POSTCODE>\\b\\d{6}\\b)" +
+                        "|(?<CITY>\\b(?:г\\.\\s+|город\\s+)[^,]+)" +
                         "|(?<REGION>\\b[^,]*?(?:край|область|регион|республика)\\b[^,]*)" +
-                        "|(?<DISTRICT>\\b[^,]*?район\\b[^,]*)" +
+                        "|(?<DISTRICT>\\b[^,]*?(?:район|р-н)\\b[^,]*)" +
                         "|(?<STREET>(?i)(?:ул\\.?|улица|пер\\.?|переулок|проспект|пр-т)\\s*[^,]+)" +
                         "|(?<HOUSE>(?i)(?:д\\.?|дом)\\s*[^,]+)" +
                         "|(?<FLAT>(?i)(?:кв\\.?|квартира)\\s*[^,]+)",
@@ -33,9 +35,9 @@ public enum MaskingPattern {
         return addressPattern.matcher(address).replaceAll(mr -> {
             Matcher matcher = (Matcher) mr;
             if (matcher.group("POSTCODE") != null) return "******";
+            if (matcher.group("CITY") != null) return "г. ******";
             if (matcher.group("REGION") != null) return "*** ***";
             if (matcher.group("DISTRICT") != null) return "*** р-н";
-            // Keep the keyword, mask the detail
             return matcher.group().replaceFirst("\\s+.+", " ***");
         });
     });
@@ -56,23 +58,16 @@ public enum MaskingPattern {
         this.compiledPattern = Pattern.compile(regex);
     }
     
-    public String getRegexPattern() {
-        return regex;
-    }
-    
-    public Object getReplacement() {
-        return replacement;
-    }
-    
     public Pattern getCompiledPattern() {
         return compiledPattern;
     }
     
+    @SuppressWarnings("unchecked")
     public String applyTo(String input) {
         if (input == null) return null;
         
-        if (replacement instanceof String) {
-            return compiledPattern.matcher(input).replaceAll((String)replacement);
+        if (replacement instanceof String stringReplacement) {
+            return compiledPattern.matcher(input).replaceAll(stringReplacement);
         } else {
             return compiledPattern.matcher(input)
                     .replaceAll((Function<MatchResult, String>)replacement);

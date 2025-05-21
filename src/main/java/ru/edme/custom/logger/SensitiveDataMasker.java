@@ -1,6 +1,5 @@
 package ru.edme.custom.logger;
 
-import org.springframework.stereotype.Component;
 import ru.edme.aop.logger.annotation.SensitiveField;
 import ru.edme.pattern.MaskingPattern;
 
@@ -12,7 +11,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-@Component
 public class SensitiveDataMasker {
     // Cache for sensitive fields
     private static final Map<Class<?>, Map<String, Field>> SENSITIVE_FIELD_CACHE = new ConcurrentHashMap<>();
@@ -20,6 +18,7 @@ public class SensitiveDataMasker {
     // Cache for masking patterns
     private static final Map<Field, MaskingPattern[]> PATTERN_CACHE = new ConcurrentHashMap<>();
     
+    // Date formatter for ISO_LOCAL_DATE
     private static final DateTimeFormatter ISO_DATE = DateTimeFormatter.ISO_LOCAL_DATE;
     
     /**
@@ -28,11 +27,11 @@ public class SensitiveDataMasker {
     public static Object mask(Object obj) {
         if (obj == null) return "null";
         
-        if (obj instanceof LocalDate) return mask(obj, MaskingPattern.DATE_YYYY_MM_DD);
+        if (obj instanceof LocalDate date) return maskLocalDate(date, MaskingPattern.DATE_YYYY_MM_DD);
         
-        if (obj instanceof String) return maskStringWithAllPatterns((String) obj);
+        if (obj instanceof String value) return maskString(value);
         
-        // For complex objects, use reflection to find sensitive fields
+        // For objects, use reflection to find sensitive fields
         return maskObject(obj);
     }
     
@@ -42,26 +41,143 @@ public class SensitiveDataMasker {
     public static Object mask(Object obj, MaskingPattern pattern) {
         if (obj == null) return "null";
         
-        if (obj instanceof LocalDate) return maskLocalDate((LocalDate) obj, pattern);
+        if (obj instanceof LocalDate date) return maskLocalDate(date, pattern);
         
-        if (!(obj instanceof String)) return mask(obj);
+        if (obj instanceof String value) return pattern.applyTo(value);
         
-        // Apply the specific pattern to the string
-        return pattern.applyTo((String) obj);
+        return mask(obj);
     }
     
     /**
-     * Masks a string with all available patterns
+     * Smart string masking - using pattern detection
      */
-    private static String maskStringWithAllPatterns(String value) {
+    private static String maskString(String value) {
+        boolean valueModified = false;
         String result = value;
         
-        for (MaskingPattern pattern : MaskingPattern.values()) {
-            if (pattern.getCompiledPattern().matcher(result).find()) {
-                result = pattern.applyTo(result);
+        // Check for a phone pattern (more specific check)
+        if (value.matches(".*\\+\\d{1,3}\\(\\d{3}\\)\\d{3}-\\d{2}-\\d{2}.*")) {
+            result = MaskingPattern.PHONE.applyTo(result);
+            valueModified = true;
+        }
+        
+        // Check for SNILS pattern (with dashes)
+        if (value.matches(".*\\d{3}-\\d{3}-\\d{3}-\\d{2}.*")) {
+            result = MaskingPattern.SNILS.applyTo(result);
+            valueModified = true;
+        }
+        
+        // Check for INN patterns (as before)
+        if (value.matches(".*\\d{10,}.*")) {
+            for (MaskingPattern pattern : new MaskingPattern[] {
+                    MaskingPattern.INN_10_DIGITS, MaskingPattern.INN_12_DIGITS}) {
+                if (pattern.getCompiledPattern().matcher(value).find()) {
+                    result = pattern.applyTo(result);
+                    valueModified = true;
+                }
             }
         }
+        
+        // Check for an email pattern
+        if (value.contains("@")) {
+            result = MaskingPattern.EMAIL.applyTo(result);
+            valueModified = true;
+        }
+        
+        // Check for date patterns
+        if (value.matches(".*\\d{2}[.-/]\\d{2}[.-/]\\d{4}.*") ||
+                value.matches(".*\\d{4}[.-/]\\d{2}[.-/]\\d{2}.*")) {
+            result = MaskingPattern.DATE_YYYY_MM_DD.applyTo(result);
+            result = MaskingPattern.DATE_DD_MM_YYYY.applyTo(result);
+            valueModified = true;
+        }
+        
+        // Apply address masking last
+        if (value.length() > 15 && value.contains(",")) {
+            result = MaskingPattern.ADDRESS.applyTo(result);
+            valueModified = true;
+        }
+        
+        // If no specific pattern was applied, but we should still mask
+        if (!valueModified && shouldMaskByDefault(value)) {
+            if (containsSensitivePattern(value)) {
+                if (value.contains("@")) {
+                    result = MaskingPattern.EMAIL.applyTo(value);
+                } else if (value.matches(".*\\d{10,}.*")) {
+                    result = value.replaceAll("\\d{6,}", "******");
+                } else {
+                    int length = value.length();
+                    result = value.substring(0, Math.min(length/4, 3)) +
+                            "*".repeat(Math.max(length - Math.min(length/4, 3) * 2, 3)) +
+                            value.substring(Math.max(length - Math.min(length/4, 3), 0));
+                }
+            }
+        }
+        
         return result;
+    }
+    
+    /**
+     * Helper method to check if a string potentially contains sensitive data
+     */
+    private static boolean containsSensitivePattern(String value) {
+        // Check for typical sensitive patterns
+        return value.matches(".*\\d{4,}.*") ||          // Contains 4+ digits
+                value.length() >= 8 ||                   // Long enough to be sensitive
+                value.matches(".*[A-Za-z]+\\d+.*") ||    // Contains letters followed by digits
+                value.matches(".*@.*");                  // Contains @ symbol
+    }
+    
+    /**
+     * Determine if a value should be masked by default logic
+     */
+    private static boolean shouldMaskByDefault(String value) {
+        // Skip very short values and common non-sensitive strings
+        if (value.length() < 3) return false;
+        
+        // Skip common non-sensitive keywords
+        String lowerValue = value.toLowerCase();
+        String[] nonSensitiveWords = {"true", "false", "yes", "no", "ok", "cancel", "none"};
+        for (String word : nonSensitiveWords) {
+            if (lowerValue.equals(word)) return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Central method for masking with multiple patterns
+     */
+    public static Object maskWithPatterns(Object obj, MaskingPattern[] patterns) {
+        if (obj == null) return "null";
+        if (patterns == null || patterns.length == 0) return mask(obj);
+        
+        // Check if NO_MASK pattern is present - if so, return the original value
+        for (MaskingPattern pattern : patterns) {
+            if (pattern == MaskingPattern.NO_MASK) {
+                return obj.toString();
+            }
+        }
+        
+        // For a single pattern, use the simple mask method
+        if (patterns.length == 1) return mask(obj, patterns[0]);
+        
+        // Handle multiple patterns
+        if (obj instanceof String result) {
+            for (MaskingPattern pattern : patterns) {
+                result = pattern.applyTo(result);
+            }
+            return result;
+        } else if (obj instanceof LocalDate date) {
+            for (MaskingPattern pattern : patterns) {
+                if (pattern == MaskingPattern.DATE_YYYY_MM_DD) {
+                    return maskLocalDate(date, pattern);
+                }
+            }
+            return maskLocalDate(date, MaskingPattern.DATE_YYYY_MM_DD);
+        } else {
+            return mask(obj, patterns[0]);
+        }
     }
     
     /**
@@ -91,7 +207,7 @@ public class SensitiveDataMasker {
                 }
                 
                 if (sensitiveFields.containsKey(fieldName)) {
-                    // This is a sensitive field, mask it
+                    // Sensitive field, mask it
                     result.append(fieldName).append("=").append(maskFieldValue(field, value));
                 } else if (value != null && !isSimpleType(value) && !value.getClass().isEnum() &&
                         !value.getClass().getPackageName().startsWith("java.")) {
@@ -135,26 +251,13 @@ public class SensitiveDataMasker {
     private static String maskFieldValue(Field field, Object value) {
         if (value == null) return "null";
         
-        String stringValue = value.toString();
         MaskingPattern[] patterns = getPatterns(field);
         
-        if (value instanceof LocalDate) {
-            for (MaskingPattern pattern : patterns) {
-                if (pattern == MaskingPattern.DATE_YYYY_MM_DD) {
-                    return maskLocalDate((LocalDate) value, pattern);
-                }
-            }
-            
-            return maskLocalDate((LocalDate)value, MaskingPattern.DATE_YYYY_MM_DD);
-        }
-        
         if (patterns.length == 0) {
+            String stringValue = value.toString();
             return "*".repeat(Math.min(stringValue.length(), 5));
         } else {
-            for (MaskingPattern pattern : patterns) {
-                stringValue = pattern.applyTo(stringValue);
-            }
-            return stringValue;
+            return maskWithPatterns(value, patterns).toString();
         }
     }
     

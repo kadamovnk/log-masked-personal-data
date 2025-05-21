@@ -43,7 +43,7 @@ public class MaskingService {
     }
     
     /**
-     * Mask a value based on the SensitiveField annotation's configuration.
+     * MaskData a value based on the SensitiveField annotation's configuration.
      * @param value the value to mask
      * @param annotation the annotation specifying masking patterns
      * @return masked value
