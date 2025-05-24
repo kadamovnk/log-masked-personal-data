@@ -7,12 +7,12 @@ import java.util.regex.Pattern;
 
 public enum MaskingPattern {
     NO_MASK("(.*)", "$1"),
-    EMAIL("([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+)", "***@masked.com"),
+    EMAIL("([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\\.[a-zA-Z0-9.-]+)", "***@$2"),
     PHONE("(\\+7\\(\\d{3}\\))\\d{3}-\\d{2}-(\\d{2})", "$1***-**-$2"),
     SNILS("(\\d{3})-\\d{3}-\\d{3}-\\d{2}", "$1-***-***-**"),
     PASSPORT_NUMBER("\\b\\d{6}\\b", "******"),
     PASSPORT_SERIES("\\b(\\d{2})\\d{2}\\b", "$1**"),
-    PASSPORT_ISSUED_BY("((?:ГУ|ОВД|МВД|ФМС)[^,\n]*)", "$1 ***"),
+    PASSPORT_ISSUED_BY("((?:ГУ|ОВД|МВД|ФМС)(?:\\s+МВД)?)(.*)", "$1 ***"),
     SUBDIVISION_CODE("(\\d{3})-(\\d{3})", "$1-***"),
     DATE_DD_MM_YYYY("\\b(\\d{2})[-.](\\d{2})[-.](\\d{4})\\b", "**.**.$3"),
     DATE_YYYY_MM_DD("\\b(\\d{4})[-.](\\d{2})[-.](\\d{2})\\b", "$1-**-**"),
