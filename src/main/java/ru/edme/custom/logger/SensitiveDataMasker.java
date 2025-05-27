@@ -8,16 +8,15 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class SensitiveDataMasker {
     // Cache for sensitive fields
     private static final Map<Class<?>, Map<String, Field>> SENSITIVE_FIELD_CACHE = new ConcurrentHashMap<>();
-    
     // Cache for masking patterns
     private static final Map<Field, MaskingPattern[]> PATTERN_CACHE = new ConcurrentHashMap<>();
-    
     // Date formatter for ISO_LOCAL_DATE
     private static final DateTimeFormatter ISO_DATE = DateTimeFormatter.ISO_LOCAL_DATE;
     
@@ -25,13 +24,11 @@ public class SensitiveDataMasker {
      * Main method to mask any object or value
      */
     public static Object mask(Object obj) {
-        if (obj == null) return "null";
-        
+        if (obj == null) {
+            return "null";
+        }
         if (obj instanceof LocalDate date) return maskLocalDate(date, MaskingPattern.DATE_YYYY_MM_DD);
-        
         if (obj instanceof String value) return maskString(value);
-        
-        // For objects, use reflection to find sensitive fields
         return maskObject(obj);
     }
     
@@ -39,12 +36,11 @@ public class SensitiveDataMasker {
      * Mask a value with a specific pattern
      */
     public static Object mask(Object obj, MaskingPattern pattern) {
-        if (obj == null) return "null";
-        
+        if (obj == null) {
+            return "null";
+        }
         if (obj instanceof LocalDate date) return maskLocalDate(date, pattern);
-        
         if (obj instanceof String value) return pattern.applyTo(value);
-        
         return mask(obj);
     }
     
@@ -52,97 +48,15 @@ public class SensitiveDataMasker {
      * Smart string masking - using pattern detection
      */
     private static String maskString(String value) {
-        boolean valueModified = false;
-        String result = value;
-        
-        // Check for a phone pattern (more specific check)
-        if (value.matches(".*\\+\\d{1,3}\\(\\d{3}\\)\\d{3}-\\d{2}-\\d{2}.*")) {
-            result = MaskingPattern.PHONE.applyTo(result);
-            valueModified = true;
+        if (value == null || value.length() < 3) {
+            return value;
         }
         
-        // Check for SNILS pattern (with dashes)
-        if (value.matches(".*\\d{3}-\\d{3}-\\d{3}-\\d{2}.*")) {
-            result = MaskingPattern.SNILS.applyTo(result);
-            valueModified = true;
+        if (MaskingPattern.EMAIL.getCompiledPattern().matcher(value).matches()) {
+            return MaskingPattern.EMAIL.applyTo(value);
         }
         
-        // Check for INN patterns (as before)
-        if (value.matches(".*\\d{10,}.*")) {
-            for (MaskingPattern pattern : new MaskingPattern[] {
-                    MaskingPattern.INN_10_DIGITS, MaskingPattern.INN_12_DIGITS}) {
-                if (pattern.getCompiledPattern().matcher(value).find()) {
-                    result = pattern.applyTo(result);
-                    valueModified = true;
-                }
-            }
-        }
-        
-        // Check for an email pattern
-        if (value.contains("@")) {
-            result = MaskingPattern.EMAIL.applyTo(result);
-            valueModified = true;
-        }
-        
-        // Check for date patterns
-        if (value.matches(".*\\d{2}[.-/]\\d{2}[.-/]\\d{4}.*") ||
-                value.matches(".*\\d{4}[.-/]\\d{2}[.-/]\\d{2}.*")) {
-            result = MaskingPattern.DATE_YYYY_MM_DD.applyTo(result);
-            result = MaskingPattern.DATE_DD_MM_YYYY.applyTo(result);
-            valueModified = true;
-        }
-        
-        // Apply address masking last
-        if (value.length() > 15 && value.contains(",")) {
-            result = MaskingPattern.ADDRESS.applyTo(result);
-            valueModified = true;
-        }
-        
-        // If no specific pattern was applied, but we should still mask
-        if (!valueModified && shouldMaskByDefault(value)) {
-            if (containsSensitivePattern(value)) {
-                if (value.contains("@")) {
-                    result = MaskingPattern.EMAIL.applyTo(value);
-                } else if (value.matches(".*\\d{10,}.*")) {
-                    result = value.replaceAll("\\d{6,}", "******");
-                } else {
-                    int length = value.length();
-                    result = value.substring(0, Math.min(length/4, 3)) +
-                            "*".repeat(Math.max(length - Math.min(length/4, 3) * 2, 3)) +
-                            value.substring(Math.max(length - Math.min(length/4, 3), 0));
-                }
-            }
-        }
-        
-        return result;
-    }
-    
-    /**
-     * Helper method to check if a string potentially contains sensitive data
-     */
-    private static boolean containsSensitivePattern(String value) {
-        // Check for typical sensitive patterns
-        return value.matches(".*\\d{4,}.*") ||          // Contains 4+ digits
-                value.length() >= 8 ||                   // Long enough to be sensitive
-                value.matches(".*[A-Za-z]+\\d+.*") ||    // Contains letters followed by digits
-                value.matches(".*@.*");                  // Contains @ symbol
-    }
-    
-    /**
-     * Determine if a value should be masked by default logic
-     */
-    private static boolean shouldMaskByDefault(String value) {
-        // Skip very short values and common non-sensitive strings
-        if (value.length() < 3) return false;
-        
-        // Skip common non-sensitive keywords
-        String lowerValue = value.toLowerCase();
-        String[] nonSensitiveWords = {"true", "false", "yes", "no", "ok", "cancel", "none"};
-        for (String word : nonSensitiveWords) {
-            if (lowerValue.equals(word)) return false;
-        }
-        
-        return true;
+        return "***";
     }
     
     /**
@@ -152,17 +66,14 @@ public class SensitiveDataMasker {
         if (obj == null) return "null";
         if (patterns == null || patterns.length == 0) return mask(obj);
         
-        // Check if NO_MASK pattern is present - if so, return the original value
         for (MaskingPattern pattern : patterns) {
             if (pattern == MaskingPattern.NO_MASK) {
                 return obj.toString();
             }
         }
         
-        // For a single pattern, use the simple mask method
         if (patterns.length == 1) return mask(obj, patterns[0]);
         
-        // Handle multiple patterns
         if (obj instanceof String result) {
             for (MaskingPattern pattern : patterns) {
                 result = pattern.applyTo(result);
@@ -191,41 +102,62 @@ public class SensitiveDataMasker {
             return obj.toString();
         }
         
+        return buildMaskedObjectString(obj, clazz, sensitiveFields);
+    }
+    
+    /**
+     * Builds a string representation of the object with masked sensitive fields
+     */
+    private static String buildMaskedObjectString(Object obj, Class<?> clazz, Map<String, Field> sensitiveFields) {
         StringBuilder result = new StringBuilder(clazz.getSimpleName() + "{");
         
         Field[] fields = clazz.getDeclaredFields();
         boolean first = true;
         
         for (Field field : fields) {
-            try {
-                field.setAccessible(true);
-                String fieldName = field.getName();
-                Object value = field.get(obj);
-                
+            String formattedField = formatField(obj, field, sensitiveFields);
+            if (formattedField != null) {
                 if (!first) {
                     result.append(", ");
                 }
-                
-                if (sensitiveFields.containsKey(fieldName)) {
-                    // Sensitive field, mask it
-                    result.append(fieldName).append("=").append(maskFieldValue(field, value));
-                } else if (value != null && !isSimpleType(value) && !value.getClass().isEnum() &&
-                        !value.getClass().getPackageName().startsWith("java.")) {
-                    // Recursively mask nested objects
-                    result.append(fieldName).append("=").append(maskObject(value));
-                } else {
-                    // Regular field, no masking needed
-                    result.append(fieldName).append("=").append(value);
-                }
-                
+                result.append(formattedField);
                 first = false;
-            } catch (Exception e) {
-                // Silently fail and continue with the next field
             }
         }
         
         result.append("}");
         return result.toString();
+    }
+    
+    /**
+     * Formats a single field for the masked object string
+     */
+    private static String formatField(Object obj, Field field, Map<String, Field> sensitiveFields) {
+        try {
+            field.setAccessible(true);
+            String fieldName = field.getName();
+            Object value = field.get(obj);
+            
+            if (sensitiveFields.containsKey(fieldName)) {
+                return fieldName + "=" + maskFieldValue(field, value);
+            } else if (shouldRecursivelyMask(value)) {
+                return fieldName + "=" + maskObject(value);
+            } else {
+                return fieldName + "=" + value;
+            }
+        } catch (Exception e) {
+            return null;
+        }
+    }
+    
+    /**
+     * Determines if a field value should be recursively masked
+     */
+    private static boolean shouldRecursivelyMask(Object value) {
+        return value != null &&
+                !isSimpleType(value) &&
+                !value.getClass().isEnum() &&
+                !value.getClass().getPackageName().startsWith("java.");
     }
     
     /**
@@ -274,10 +206,18 @@ public class SensitiveDataMasker {
         if (obj == null) return true;
         
         Class<?> clazz = obj.getClass();
-        return clazz.isPrimitive() ||
-                clazz == String.class ||
-                clazz == Boolean.class ||
-                clazz == Character.class ||
-                Number.class.isAssignableFrom(clazz);
+        return clazz.isPrimitive() || SIMPLE_TYPES.contains(clazz);
     }
+    
+    private static final Set<Class<?>> SIMPLE_TYPES = Set.of(
+            String.class,
+            Boolean.class,
+            Character.class,
+            Byte.class,
+            Short.class,
+            Integer.class,
+            Long.class,
+            Float.class,
+            Double.class
+    );
 }

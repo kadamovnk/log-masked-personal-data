@@ -195,14 +195,6 @@ public class SensitiveDataLogger implements Logger {
     
     // ----------- DEBUG LEVEL METHODS -----------
     
-    public void debug(String format, Object arg, MaskData maskData) {
-        logSingle(delegate::debug, format, arg, maskData);
-    }
-    
-    public void debug(String format, Object[] args, MaskData[] patterns) {
-        logMultiple(delegate::debug, format, args, patterns);
-    }
-    
     @Override
     public void debug(String msg) {
         delegate.debug(msg);

@@ -5,6 +5,8 @@ import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.regex.Pattern.*;
+
 public enum MaskingPattern {
     NO_MASK("(.*)", "$1"),
     EMAIL("([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\\.[a-zA-Z0-9.-]+)", "***@$2"),
@@ -22,7 +24,7 @@ public enum MaskingPattern {
     FULL_NAME("\\b[А-ЯЁ][а-яё]+\\b", "***"),
     ADDRESS("(.*)", matchResult -> {
         String address = matchResult.group(1);
-        Pattern addressPattern = Pattern.compile(
+        Pattern addressPattern = compile(
                 "(?<POSTCODE>\\b\\d{6}\\b)" +
                         "|(?<CITY>\\b(?:г\\.\\s+|город\\s+)[^,]+)" +
                         "|(?<REGION>\\b[^,]*?(?:край|область|регион|республика)\\b[^,]*)" +
@@ -30,7 +32,7 @@ public enum MaskingPattern {
                         "|(?<STREET>(?i)(?:ул\\.?|улица|пер\\.?|переулок|проспект|пр-т)\\s*[^,]+)" +
                         "|(?<HOUSE>(?i)(?:д\\.?|дом)\\s*[^,]+)" +
                         "|(?<FLAT>(?i)(?:кв\\.?|квартира)\\s*[^,]+)",
-                Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
+                CASE_INSENSITIVE | UNICODE_CASE
         );
         return addressPattern.matcher(address).replaceAll(mr -> {
             Matcher matcher = (Matcher) mr;
@@ -49,13 +51,13 @@ public enum MaskingPattern {
     MaskingPattern(String regex, String replacement) {
         this.regex = regex;
         this.replacement = replacement;
-        this.compiledPattern = Pattern.compile(regex);
+        this.compiledPattern = compile(regex);
     }
     
     MaskingPattern(String regex, Function<MatchResult, String> replacement) {
         this.regex = regex;
         this.replacement = replacement;
-        this.compiledPattern = Pattern.compile(regex);
+        this.compiledPattern = compile(regex);
     }
     
     public Pattern getCompiledPattern() {

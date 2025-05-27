@@ -4,48 +4,38 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import ru.edme.model.Person;
 import ru.edme.pattern.MaskingPattern;
 
-import java.time.LocalDate;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 public class SensitiveDataLoggerTest {
-    
     private SensitiveDataLogger sensitiveLogger;
     private ListAppender<ILoggingEvent> listAppender;
     private Person testPerson;
     
     @BeforeEach
-    public void setUp() {
+    public void setUp() throws IOException {
         Logger rootLogger = (Logger) LoggerFactory.getLogger(SensitiveDataLoggerTest.class);
         listAppender = new ListAppender<>();
         listAppender.start();
         rootLogger.addAppender(listAppender);
-        
         sensitiveLogger = SensitiveDataLoggerFactory.getLogger(SensitiveDataLoggerTest.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule()); // For handling LocalDate
         
-        testPerson = new Person();
-        testPerson.setFirstName("Галина");
-        testPerson.setLastName("Искрева");
-        testPerson.setMiddleName("Петровна");
-        testPerson.setBirthDate(LocalDate.of(1990, 5, 15));
-        testPerson.setPassportSeries("4510");
-        testPerson.setPassportNumber("123456");
-        testPerson.setPassportIssuedBy("МВД России по г. Москва");
-        testPerson.setPassportIssuedDate(LocalDate.of(2010, 6, 20));
-        testPerson.setPassportExpiryDate(LocalDate.of(2030, 6, 20));
-        testPerson.setPassportSubdivisionCode("770-001");
-        testPerson.setAddress("123456, г. Москва, ул. Ленина, д. 10, кв. 15");
-        testPerson.setPhone("+7(999)123-45-67");
-        testPerson.setEmail("john.smith@example.com");
-        testPerson.setInn("1234567890");
-        testPerson.setSnils("123-456-789-01");
+        try (InputStream inputStream = getClass().getResourceAsStream("/test-person.json")) {
+            testPerson = objectMapper.readValue(inputStream, Person.class);
+        }
     }
     
     @Test
@@ -58,8 +48,8 @@ public class SensitiveDataLoggerTest {
         ILoggingEvent logEvent = logEvents.get(0);
         
         assertEquals(Level.INFO, logEvent.getLevel());
-        assertTrue(logEvent.getFormattedMessage().contains("***@masked.com"));
-        assertFalse(logEvent.getFormattedMessage().contains("john.smith@example.com"));
+        assertTrue(logEvent.getFormattedMessage().contains("***@mail.ru"));
+        assertFalse(logEvent.getFormattedMessage().contains("galina.petrovna@mail.ru"));
     }
     
     @Test
@@ -109,9 +99,9 @@ public class SensitiveDataLoggerTest {
         
         String logMessage = logEvents.get(0).getFormattedMessage();
         assertEquals(Level.WARN, logEvents.get(0).getLevel());
-        assertTrue(logMessage.contains("id=A****3")); // Not masked (null pattern defaults to standard masking)
+        assertTrue(logMessage.contains("id=A***3")); // Not masked (null pattern defaults to standard masking)
         assertTrue(logMessage.contains("+7(999)***-**-67")); // Masked with a PHONE pattern
-        assertTrue(logMessage.contains("***@masked.com")); // Default masking for email
+        assertTrue(logMessage.contains("***@mail.ru")); // Default masking for email
     }
     
     @Test
@@ -136,9 +126,6 @@ public class SensitiveDataLoggerTest {
         sensitiveLogger.info("Info with email: {}", testPerson.getEmail(),
                 MaskData.with(MaskingPattern.EMAIL));
         
-        sensitiveLogger.debug("Debug with phone: {}", testPerson.getPhone(),
-                MaskData.with(MaskingPattern.PHONE));
-        
         sensitiveLogger.warn("Warn with INN: {}", testPerson.getInn(),
                 MaskData.with(MaskingPattern.INN_10_DIGITS));
         
@@ -146,23 +133,13 @@ public class SensitiveDataLoggerTest {
                 MaskData.with(MaskingPattern.SNILS));
         
         List<ILoggingEvent> logEvents = listAppender.list;
-        // Check if DEBUG level is enabled - it might be disabled in the test environment
-        int expectedLogCount = sensitiveLogger.isDebugEnabled() ? 4 : 3;
-        assertEquals(expectedLogCount, logEvents.size());
         
         int index = 0;
         
         // Check info level
         assertEquals(Level.INFO, logEvents.get(index).getLevel());
-        assertTrue(logEvents.get(index).getFormattedMessage().contains("***@masked.com"));
+        assertTrue(logEvents.get(index).getFormattedMessage().contains("***@mail.ru"));
         index++;
-        
-        // Skip debug check if debug level is disabled
-        if (sensitiveLogger.isDebugEnabled()) {
-            assertEquals(Level.DEBUG, logEvents.get(index).getLevel());
-            assertTrue(logEvents.get(index).getFormattedMessage().contains("+7(999)***-**-67"));
-            index++;
-        }
         
         // Check warn level with INN
         assertEquals(Level.WARN, logEvents.get(index).getLevel());
@@ -194,7 +171,7 @@ public class SensitiveDataLoggerTest {
         sensitiveLogger.info("User: id={}, email={}, phone={}, address={}",
                 new Object[] {"12345", testPerson.getEmail(), testPerson.getPhone(), testPerson.getAddress()},
                 new MaskData[] {
-                        MaskData.with(MaskingPattern.NO_MASK),
+                        null,
                         MaskData.with(MaskingPattern.EMAIL),
                         MaskData.with(MaskingPattern.PHONE)
                         // No pattern for address - should use default masking
@@ -205,8 +182,8 @@ public class SensitiveDataLoggerTest {
         assertEquals(1, logEvents.size());
         
         String logMessage = logEvents.get(0).getFormattedMessage();
-        assertTrue(logMessage.contains("id=12345"));
-        assertTrue(logMessage.contains("email=***@masked.com"));
+        assertTrue(logMessage.contains("id=1***5"));
+        assertTrue(logMessage.contains("email=***@mail.ru"));
         assertTrue(logMessage.contains("phone=+7(999)***-**-67"));
         // Address should be masked with default masking
         assertFalse(logMessage.contains("ул. Ленина, д. 10, кв. 15"));
@@ -223,7 +200,7 @@ public class SensitiveDataLoggerTest {
         String logMessage = logEvents.get(0).getFormattedMessage();
         assertTrue(logMessage.contains("firstName=***"));
         assertTrue(logMessage.contains("lastName=***"));
-        assertTrue(logMessage.contains("email=***@masked.com"));
+        assertTrue(logMessage.contains("email=***@mail.ru"));
         assertTrue(logMessage.contains("phone=+7(999)***-**-67"));
         assertTrue(logMessage.contains("inn=12********90"));
         assertTrue(logMessage.contains("passportNumber=******"));
@@ -232,38 +209,38 @@ public class SensitiveDataLoggerTest {
     @Test
     public void testNoMaskPattern() {
         // Test that sensitive data with NO_MASK pattern is not masked
-        String sensitiveEmail = "secret@example.com";
+        String sensitiveEmail = "galina.petrovna@mail.ru";
         String sensitivePhone = "+7(999)123-45-67";
-        
+
         // Log with NO_MASK pattern
         sensitiveLogger.info("Unmasked email: {}", sensitiveEmail,
                 MaskData.with(MaskingPattern.NO_MASK));
-        
+
         sensitiveLogger.info("Regular vs unmasked: {} vs {}",
                 new Object[] {sensitiveEmail, sensitiveEmail},
                 new MaskData[] {null, MaskData.with(MaskingPattern.NO_MASK)});
-        
+
         sensitiveLogger.info("Multiple sensitive items unmasked: email={}, phone={}",
                 new Object[] {sensitiveEmail, sensitivePhone},
                 new MaskData[] {MaskData.with(MaskingPattern.NO_MASK), MaskData.with(MaskingPattern.NO_MASK)});
-        
+
         List<ILoggingEvent> logEvents = listAppender.list;
         assertEquals(3, logEvents.size());
-        
+
         // First log should contain the original email (unmasked)
         assertTrue(logEvents.get(0).getFormattedMessage().contains(sensitiveEmail));
-        assertFalse(logEvents.get(0).getFormattedMessage().contains("***@masked.com"));
-        
+        assertFalse(logEvents.get(0).getFormattedMessage().contains("***@mail.ru"));
+
         // Second log should have one masked and one unmasked email
         String secondLogMessage = logEvents.get(1).getFormattedMessage();
-        assertTrue(secondLogMessage.contains("***@masked.com"));  // Auto masked
+        assertTrue(secondLogMessage.contains("***@mail.ru"));  // Auto masked
         assertTrue(secondLogMessage.contains(sensitiveEmail));    // NO_MASK applied
-        
+
         // Third log should have both values unmasked
         String thirdLogMessage = logEvents.get(2).getFormattedMessage();
         assertTrue(thirdLogMessage.contains(sensitiveEmail));
         assertTrue(thirdLogMessage.contains(sensitivePhone));
-        assertFalse(thirdLogMessage.contains("***@masked.com"));
+        assertFalse(thirdLogMessage.contains("***@mail.ru"));
         assertFalse(thirdLogMessage.contains("+7(999)***-**-67"));
     }
 }

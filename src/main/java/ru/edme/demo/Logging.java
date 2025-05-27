@@ -15,6 +15,7 @@ public class Logging {
 //    @LogMasked
     public void log(Person person) {
         log.info("Logging Person: {}", person);
+        //noinspection LoggingPlaceholderCountMatchesArgumentCount
         log.info("First Name: {}", person.getFirstName(), MaskData.with(MaskingPattern.FULL_NAME));
         log.debug("Last Name: {}", person.getLastName(), MaskData.with(MaskingPattern.FULL_NAME));
         log.error("Middle Name: {}", person.getMiddleName(), MaskData.with(MaskingPattern.FULL_NAME));
