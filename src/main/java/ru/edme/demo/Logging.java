@@ -9,13 +9,11 @@ import ru.edme.model.Person;
 
 @Service
 public class Logging {
-    
     private static final SensitiveDataLogger log = SensitiveDataLoggerFactory.getLogger(Logging.class);
     
-//    @LogMasked
+    //noinspection LoggingPlaceholderCountMatchesArgumentCount
     public void log(Person person) {
         log.info("Logging Person: {}", person);
-        //noinspection LoggingPlaceholderCountMatchesArgumentCount
         log.info("First Name: {}", person.getFirstName(), MaskData.with(MaskingPattern.FULL_NAME));
         log.debug("Last Name: {}", person.getLastName(), MaskData.with(MaskingPattern.FULL_NAME));
         log.error("Middle Name: {}", person.getMiddleName(), MaskData.with(MaskingPattern.FULL_NAME));
@@ -34,13 +32,20 @@ public class Logging {
         log.info("SNILS: {}", person.getSnils(), MaskData.with(MaskingPattern.SNILS));
         log.info("Test: {}", "333333333333", MaskData.with(MaskingPattern.INN_10_DIGITS, MaskingPattern.INN_12_DIGITS));
         log.info("Passport: expiry={}",
-                new Object[] {person.getPassportExpiryDate()},
+                new Object[] {
+                        person.getPassportExpiryDate()
+                },
                 new MaskData[] {
                         MaskData.with(MaskingPattern.DATE_YYYY_MM_DD)
                 }
         );
         log.warn("Passport: expiry={}, issued={}, series={}, number={}",
-                new Object[] {person.getPassportExpiryDate(), person.getPassportIssuedDate(), person.getPassportSeries(), person.getPassportNumber()},
+                new Object[] {
+                        person.getPassportExpiryDate(),
+                        person.getPassportIssuedDate(),
+                        person.getPassportSeries(),
+                        person.getPassportNumber()
+                },
                 new MaskData[] {
                         null,
                         MaskData.with(MaskingPattern.DATE_YYYY_MM_DD),
@@ -49,7 +54,12 @@ public class Logging {
                 }
         );
         log.debug("Passport: expiry={}, issued={}, series={}, number={}",
-                new Object[] {person.getPassportExpiryDate(), person.getPassportIssuedDate(), person.getPassportSeries(), person.getPassportNumber()},
+                new Object[] {
+                        person.getPassportExpiryDate(),
+                        person.getPassportIssuedDate(),
+                        person.getPassportSeries(),
+                        person.getPassportNumber()
+                },
                 new MaskData[] {
                         null,
                         MaskData.with(MaskingPattern.DATE_YYYY_MM_DD, MaskingPattern.DATE_YYYY_MM_DD),
@@ -58,7 +68,9 @@ public class Logging {
                 }
         );
         log.error("Passport: expiry={}",
-                new Object[] {person.getPassportExpiryDate()},
+                new Object[] {
+                        person.getPassportExpiryDate()
+                },
                 new MaskData[] {
                         null,
                         MaskData.with(MaskingPattern.DATE_YYYY_MM_DD),
@@ -67,7 +79,11 @@ public class Logging {
                 }
         );
         log.trace("Passport: expiry={}, issued={}, series={}, number={}",
-                new Object[] {person.getPassportExpiryDate(), person.getPassportIssuedDate(), person.getPassportSeries(), person.getPassportNumber()},
+                new Object[] {
+                        person.getPassportExpiryDate(),
+                        person.getPassportIssuedDate(),
+                        person.getPassportSeries(),
+                        person.getPassportNumber()},
                 new MaskData[] {
                         MaskData.with(MaskingPattern.DATE_YYYY_MM_DD),
                         MaskData.with(MaskingPattern.DATE_YYYY_MM_DD),

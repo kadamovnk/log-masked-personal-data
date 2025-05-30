@@ -13,12 +13,79 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class SensitiveDataMasker {
-    // Cache for sensitive fields
     private static final Map<Class<?>, Map<String, Field>> SENSITIVE_FIELD_CACHE = new ConcurrentHashMap<>();
-    // Cache for masking patterns
     private static final Map<Field, MaskingPattern[]> PATTERN_CACHE = new ConcurrentHashMap<>();
-    // Date formatter for ISO_LOCAL_DATE
     private static final DateTimeFormatter ISO_DATE = DateTimeFormatter.ISO_LOCAL_DATE;
+    
+    /**
+     * Helper method to mask arguments with no specific pattern
+     */
+    public static Object[] maskArgs(Object... args) {
+        if (args == null || args.length == 0) return args;
+        Object[] maskedArgs = new Object[args.length];
+        
+        for (int i = 0; i < args.length; i++) {
+            maskedArgs[i] = mask(args[i]);
+        }
+        
+        return maskedArgs;
+    }
+    
+    /**
+     * Helper method to mask an argument with a specific pattern
+     */
+    public static Object maskArg(Object arg, MaskData maskData) {
+        if (maskData == null) {
+            return mask(arg);
+        }
+        
+        MaskingPattern[] patterns = maskData.patterns();
+        
+        if (patterns.length == 0) {
+            return mask(arg);
+        }
+        
+        if (patterns.length == 1) {
+            return mask(arg, patterns[0]);
+        }
+        
+        return maskWithPatterns(arg, patterns);
+    }
+    
+    /**
+     * Apply specific masking patterns to arguments
+     */
+    public static Object[] maskArgs(Object[] args, MaskData maskData) {
+        if (args == null || args.length == 0) {
+            return args;
+        }
+        
+        Object[] maskedArgs = new Object[args.length];
+        maskedArgs[0] = maskArg(args[0], maskData);
+        
+        for (int i = 1; i < args.length; i++) {
+            maskedArgs[i] = mask(args[i]);
+        }
+        
+        return maskedArgs;
+    }
+    
+    /**
+     * Process arguments, extracting MaskData if present
+     */
+    public static Object[] processMaskingArgs(Object[] arguments) {
+        if (arguments == null || arguments.length == 0) {
+            return arguments;
+        }
+        
+        if (arguments[arguments.length - 1] instanceof MaskData maskData) {
+            Object[] actualArgs = new Object[arguments.length - 1];
+            System.arraycopy(arguments, 0, actualArgs, 0, actualArgs.length);
+            return maskArgs(actualArgs, maskData);
+        }
+        
+        return maskArgs(arguments);
+    }
     
     /**
      * Main method to mask any object or value
@@ -27,8 +94,15 @@ public class SensitiveDataMasker {
         if (obj == null) {
             return "null";
         }
-        if (obj instanceof LocalDate date) return maskLocalDate(date, MaskingPattern.DATE_YYYY_MM_DD);
-        if (obj instanceof String value) return maskString(value);
+        
+        if (obj instanceof LocalDate date) {
+            return maskLocalDate(date, MaskingPattern.DATE_YYYY_MM_DD);
+        }
+        
+        if (obj instanceof String value) {
+            return maskString(value);
+        }
+        
         return maskObject(obj);
     }
     
@@ -39,8 +113,15 @@ public class SensitiveDataMasker {
         if (obj == null) {
             return "null";
         }
-        if (obj instanceof LocalDate date) return maskLocalDate(date, pattern);
-        if (obj instanceof String value) return pattern.applyTo(value);
+        
+        if (obj instanceof LocalDate date) {
+            return maskLocalDate(date, pattern);
+        }
+        
+        if (obj instanceof String value) {
+            return pattern.applyTo(value);
+        }
+        
         return mask(obj);
     }
     
@@ -63,8 +144,13 @@ public class SensitiveDataMasker {
      * Central method for masking with multiple patterns
      */
     public static Object maskWithPatterns(Object obj, MaskingPattern[] patterns) {
-        if (obj == null) return "null";
-        if (patterns == null || patterns.length == 0) return mask(obj);
+        if (obj == null) {
+            return "null";
+        }
+        
+        if (patterns == null || patterns.length == 0) {
+            return mask(obj);
+        }
         
         for (MaskingPattern pattern : patterns) {
             if (pattern == MaskingPattern.NO_MASK) {
@@ -72,7 +158,9 @@ public class SensitiveDataMasker {
             }
         }
         
-        if (patterns.length == 1) return mask(obj, patterns[0]);
+        if (patterns.length == 1) {
+            return mask(obj, patterns[0]);
+        }
         
         if (obj instanceof String result) {
             for (MaskingPattern pattern : patterns) {
@@ -110,7 +198,6 @@ public class SensitiveDataMasker {
      */
     private static String buildMaskedObjectString(Object obj, Class<?> clazz, Map<String, Field> sensitiveFields) {
         StringBuilder result = new StringBuilder(clazz.getSimpleName() + "{");
-        
         Field[] fields = clazz.getDeclaredFields();
         boolean first = true;
         

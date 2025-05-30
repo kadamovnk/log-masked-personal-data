@@ -3,9 +3,10 @@ package ru.edme.custom.logger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Marker;
-import ru.edme.pattern.MaskingPattern;
 
 import java.util.function.BiConsumer;
+
+import static ru.edme.custom.logger.SensitiveDataMasker.*;
 
 public class SensitiveDataLogger implements Logger {
     private final Logger delegate;
@@ -362,71 +363,6 @@ public class SensitiveDataLogger implements Logger {
         return delegate.getName();
     }
     
-    /**
-     * Helper method to mask arguments with no specific pattern
-     */
-    private Object[] maskArgs(Object... args) {
-        if (args == null || args.length == 0) return args;
-        
-        Object[] maskedArgs = new Object[args.length];
-        for (int i = 0; i < args.length; i++) {
-            maskedArgs[i] = SensitiveDataMasker.mask(args[i]);
-        }
-        
-        return maskedArgs;
-    }
-    
-    /**
-     * Helper method to mask an argument with a specific pattern
-     */
-    private Object maskArg(Object arg, MaskData maskData) {
-        if (maskData == null) return SensitiveDataMasker.mask(arg);
-        
-        MaskingPattern[] patterns = maskData.patterns();
-        if (patterns.length == 0) return SensitiveDataMasker.mask(arg);
-        if (patterns.length == 1) return SensitiveDataMasker.mask(arg, patterns[0]);
-        return maskWithMultiplePatterns(arg, patterns);
-    }
-    
-    /**
-     * Helper method to mask an argument with multiple patterns
-     */
-    private Object maskWithMultiplePatterns(Object arg, MaskingPattern[] patterns) {
-        return SensitiveDataMasker.maskWithPatterns(arg, patterns);
-    }
-    
-    /**
-     * Process arguments, extracting MaskData if present
-     */
-    private Object[] processMaskingArgs(Object[] arguments) {
-        if (arguments == null || arguments.length == 0) return arguments;
-        
-        // Check if the last argument is MaskData
-        if (arguments[arguments.length - 1] instanceof MaskData maskData) {
-            Object[] actualArgs = new Object[arguments.length - 1];
-            System.arraycopy(arguments, 0, actualArgs, 0, actualArgs.length);
-            
-            return maskArgs(actualArgs, maskData);
-        }
-        
-        return maskArgs(arguments);
-    }
-    
-    /**
-     * Apply specific masking patterns to arguments
-     */
-    private Object[] maskArgs(Object[] args, MaskData maskData) {
-        if (args == null || args.length == 0) return args;
-        
-        Object[] maskedArgs = new Object[args.length];
-        // Apply a pattern to the first arg, standard masking to the rest
-        maskedArgs[0] = maskArg(args[0], maskData);
-        for (int i = 1; i < args.length; i++) {
-            maskedArgs[i] = SensitiveDataMasker.mask(args[i]);
-        }
-        return maskedArgs;
-    }
-    
     // ----------- GENERIC LOG METHOD HANDLERS -----------
     
     @FunctionalInterface
@@ -450,11 +386,12 @@ public class SensitiveDataLogger implements Logger {
         }
         
         Object[] maskedArgs = new Object[args.length];
+        
         for (int i = 0; i < args.length; i++) {
             if (i < patterns.length && patterns[i] != null) {
                 maskedArgs[i] = maskArg(args[i], patterns[i]);
             } else {
-                maskedArgs[i] = SensitiveDataMasker.mask(args[i]);
+                maskedArgs[i] = mask(args[i]);
             }
         }
         
@@ -463,8 +400,8 @@ public class SensitiveDataLogger implements Logger {
     
     private void logPair(BiConsumer<String, Object[]> logMethod, String format, Object arg1, Object arg2) {
         Object[] args = new Object[2];
-        args[0] = SensitiveDataMasker.mask(arg1);
-        args[1] = SensitiveDataMasker.mask(arg2);
+        args[0] = mask(arg1);
+        args[1] = mask(arg2);
         logMethod.accept(format, args);
     }
     
@@ -473,13 +410,13 @@ public class SensitiveDataLogger implements Logger {
     }
     
     private void logMarkerSingle(MarkerLogMethod logMethod, Marker marker, String format, Object arg) {
-        logMethod.log(marker, format, SensitiveDataMasker.mask(arg));
+        logMethod.log(marker, format, mask(arg));
     }
     
     private void logMarkerPair(MarkerLogArrayMethod logMethod, Marker marker, String format, Object arg1, Object arg2) {
         Object[] args = new Object[2];
-        args[0] = SensitiveDataMasker.mask(arg1);
-        args[1] = SensitiveDataMasker.mask(arg2);
+        args[0] = mask(arg1);
+        args[1] = mask(arg2);
         logMethod.log(marker, format, args);
     }
     

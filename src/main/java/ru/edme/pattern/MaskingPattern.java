@@ -5,7 +5,9 @@ import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.util.regex.Pattern.*;
+import static java.util.regex.Pattern.CASE_INSENSITIVE;
+import static java.util.regex.Pattern.UNICODE_CASE;
+import static java.util.regex.Pattern.compile;
 
 public enum MaskingPattern {
     NO_MASK("(.*)", "$1"),
