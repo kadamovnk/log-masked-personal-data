@@ -4,24 +4,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Marker;
 
-import java.util.function.BiConsumer;
-
-import static ru.edme.custom.logger.SensitiveDataMasker.*;
+import static ru.edme.custom.logger.SensitiveDataMasker.mask;
+import static ru.edme.custom.logger.SensitiveDataMasker.maskArgs;
 
 public class SensitiveDataLogger implements Logger {
     private final Logger delegate;
     
     public SensitiveDataLogger(Class<?> clazz) {
         this.delegate = LoggerFactory.getLogger(clazz);
-    }
-    
-    // ----------- INFO LEVEL METHODS -----------
-    public void info(String format, Object arg, MaskData maskData) {
-        logSingle(delegate::info, format, arg, maskData);
-    }
-    
-    public void info(String format, Object[] args, MaskData[] patterns) {
-        logMultiple(delegate::info, format, args, patterns);
     }
     
     @Override
@@ -31,17 +21,17 @@ public class SensitiveDataLogger implements Logger {
     
     @Override
     public void info(String format, Object arg) {
-        logSingle(delegate::info, format, arg, null);
+        delegate.info(format, mask(arg));
     }
     
     @Override
     public void info(String format, Object arg1, Object arg2) {
-        logPair(delegate::info, format, arg1, arg2);
+        delegate.info(format, mask(arg1), mask(arg2));
     }
     
     @Override
     public void info(String format, Object... arguments) {
-        logVarargs(delegate::info, format, arguments);
+        delegate.info(format, maskArgs(arguments));
     }
     
     @Override
@@ -56,32 +46,22 @@ public class SensitiveDataLogger implements Logger {
     
     @Override
     public void info(Marker marker, String format, Object arg) {
-        logMarkerSingle(delegate::info, marker, format, arg);
+        delegate.info(marker, format, mask(arg));
     }
     
     @Override
     public void info(Marker marker, String format, Object arg1, Object arg2) {
-        logMarkerPair(delegate::info, marker, format, arg1, arg2);
+        delegate.info(marker, format, mask(arg1), mask(arg2));
     }
     
     @Override
     public void info(Marker marker, String format, Object... arguments) {
-        logMarkerVarargs(delegate::info, marker, format, arguments);
+        delegate.info(marker, format, maskArgs(arguments));
     }
     
     @Override
     public void info(Marker marker, String msg, Throwable t) {
         delegate.info(marker, msg, t);
-    }
-    
-    // ----------- ERROR LEVEL METHODS -----------
-    
-    public void error(String format, Object arg, MaskData maskData) {
-        logSingle(delegate::error, format, arg, maskData);
-    }
-    
-    public void error(String format, Object[] args, MaskData[] patterns) {
-        logMultiple(delegate::error, format, args, patterns);
     }
     
     @Override
@@ -91,17 +71,17 @@ public class SensitiveDataLogger implements Logger {
     
     @Override
     public void error(String format, Object arg) {
-        logSingle(delegate::error, format, arg, null);
+        delegate.error(format, mask(arg));
     }
     
     @Override
     public void error(String format, Object arg1, Object arg2) {
-        logPair(delegate::error, format, arg1, arg2);
+        delegate.error(format, mask(arg1), mask(arg2));
     }
     
     @Override
     public void error(String format, Object... arguments) {
-        logVarargs(delegate::error, format, arguments);
+        delegate.error(format, maskArgs(arguments));
     }
     
     @Override
@@ -116,32 +96,22 @@ public class SensitiveDataLogger implements Logger {
     
     @Override
     public void error(Marker marker, String format, Object arg) {
-        logMarkerSingle(delegate::error, marker, format, arg);
+        delegate.error(marker, format, mask(arg));
     }
     
     @Override
     public void error(Marker marker, String format, Object arg1, Object arg2) {
-        logMarkerPair(delegate::error, marker, format, arg1, arg2);
+        delegate.error(marker, format, mask(arg1), mask(arg2));
     }
     
     @Override
     public void error(Marker marker, String format, Object... arguments) {
-        logMarkerVarargs(delegate::error, marker, format, arguments);
+        delegate.error(marker, format, maskArgs(arguments));
     }
     
     @Override
     public void error(Marker marker, String msg, Throwable t) {
         delegate.error(marker, msg, t);
-    }
-    
-    // ----------- WARN LEVEL METHODS -----------
-    
-    public void warn(String format, Object arg, MaskData maskData) {
-        logSingle(delegate::warn, format, arg, maskData);
-    }
-    
-    public void warn(String format, Object[] args, MaskData[] patterns) {
-        logMultiple(delegate::warn, format, args, patterns);
     }
     
     @Override
@@ -151,17 +121,17 @@ public class SensitiveDataLogger implements Logger {
     
     @Override
     public void warn(String format, Object arg) {
-        logSingle(delegate::warn, format, arg, null);
+        delegate.warn(format, mask(arg));
     }
     
     @Override
     public void warn(String format, Object arg1, Object arg2) {
-        logPair(delegate::warn, format, arg1, arg2);
+        delegate.warn(format, mask(arg1), mask(arg2));
     }
     
     @Override
     public void warn(String format, Object... arguments) {
-        logVarargs(delegate::warn, format, arguments);
+        delegate.warn(format, maskArgs(arguments));
     }
     
     @Override
@@ -176,25 +146,23 @@ public class SensitiveDataLogger implements Logger {
     
     @Override
     public void warn(Marker marker, String format, Object arg) {
-        logMarkerSingle(delegate::warn, marker, format, arg);
+        delegate.warn(marker, format, mask(arg));
     }
     
     @Override
     public void warn(Marker marker, String format, Object arg1, Object arg2) {
-        logMarkerPair(delegate::warn, marker, format, arg1, arg2);
+        delegate.warn(marker, format, mask(arg1), mask(arg2));
     }
     
     @Override
     public void warn(Marker marker, String format, Object... arguments) {
-        logMarkerVarargs(delegate::warn, marker, format, arguments);
+        delegate.warn(marker, format, maskArgs(arguments));
     }
     
     @Override
     public void warn(Marker marker, String msg, Throwable t) {
         delegate.warn(marker, msg, t);
     }
-    
-    // ----------- DEBUG LEVEL METHODS -----------
     
     @Override
     public void debug(String msg) {
@@ -203,17 +171,17 @@ public class SensitiveDataLogger implements Logger {
     
     @Override
     public void debug(String format, Object arg) {
-        logSingle(delegate::debug, format, arg, null);
+        delegate.debug(format, mask(arg));
     }
     
     @Override
     public void debug(String format, Object arg1, Object arg2) {
-        logPair(delegate::debug, format, arg1, arg2);
+        delegate.debug(format, mask(arg1), mask(arg2));
     }
     
     @Override
     public void debug(String format, Object... arguments) {
-        logVarargs(delegate::debug, format, arguments);
+        delegate.debug(format, maskArgs(arguments));
     }
     
     @Override
@@ -228,32 +196,22 @@ public class SensitiveDataLogger implements Logger {
     
     @Override
     public void debug(Marker marker, String format, Object arg) {
-        logMarkerSingle(delegate::debug, marker, format, arg);
+        delegate.debug(marker, format, mask(arg));
     }
     
     @Override
     public void debug(Marker marker, String format, Object arg1, Object arg2) {
-        logMarkerPair(delegate::debug, marker, format, arg1, arg2);
+        delegate.debug(marker, format, mask(arg1), mask(arg2));
     }
     
     @Override
     public void debug(Marker marker, String format, Object... arguments) {
-        logMarkerVarargs(delegate::debug, marker, format, arguments);
+        delegate.debug(marker, format, maskArgs(arguments));
     }
     
     @Override
     public void debug(Marker marker, String msg, Throwable t) {
         delegate.debug(marker, msg, t);
-    }
-    
-    // ----------- TRACE LEVEL METHODS -----------
-    
-    public void trace(String format, Object arg, MaskData maskData) {
-        logSingle(delegate::trace, format, arg, maskData);
-    }
-    
-    public void trace(String format, Object[] args, MaskData[] patterns) {
-        logMultiple(delegate::trace, format, args, patterns);
     }
     
     @Override
@@ -263,17 +221,17 @@ public class SensitiveDataLogger implements Logger {
     
     @Override
     public void trace(String format, Object arg) {
-        logSingle(delegate::trace, format, arg, null);
+        delegate.trace(format, mask(arg));
     }
     
     @Override
     public void trace(String format, Object arg1, Object arg2) {
-        logPair(delegate::trace, format, arg1, arg2);
+        delegate.trace(format, mask(arg1), mask(arg2));
     }
     
     @Override
     public void trace(String format, Object... arguments) {
-        logVarargs(delegate::trace, format, arguments);
+        delegate.trace(format, maskArgs(arguments));
     }
     
     @Override
@@ -288,25 +246,23 @@ public class SensitiveDataLogger implements Logger {
     
     @Override
     public void trace(Marker marker, String format, Object arg) {
-        logMarkerSingle(delegate::trace, marker, format, arg);
+        delegate.trace(marker, format, mask(arg));
     }
     
     @Override
     public void trace(Marker marker, String format, Object arg1, Object arg2) {
-        logMarkerPair(delegate::trace, marker, format, arg1, arg2);
+        delegate.trace(marker, format, mask(arg1), mask(arg2));
     }
     
     @Override
     public void trace(Marker marker, String format, Object... arguments) {
-        logMarkerVarargs(delegate::trace, marker, format, arguments);
+        delegate.trace(marker, format, maskArgs(arguments));
     }
     
     @Override
     public void trace(Marker marker, String msg, Throwable t) {
         delegate.trace(marker, msg, t);
     }
-    
-    // ----------- ENABLED CHECKS -----------
     
     @Override
     public boolean isTraceEnabled() {
@@ -361,66 +317,5 @@ public class SensitiveDataLogger implements Logger {
     @Override
     public String getName() {
         return delegate.getName();
-    }
-    
-    // ----------- GENERIC LOG METHOD HANDLERS -----------
-    
-    @FunctionalInterface
-    private interface MarkerLogMethod {
-        void log(Marker marker, String format, Object arg);
-    }
-    
-    @FunctionalInterface
-    private interface MarkerLogArrayMethod {
-        void log(Marker marker, String format, Object[] args);
-    }
-    
-    private void logSingle(BiConsumer<String, Object> logMethod, String format, Object arg, MaskData maskData) {
-        logMethod.accept(format, maskArg(arg, maskData));
-    }
-    
-    private void logMultiple(BiConsumer<String, Object[]> logMethod, String format, Object[] args, MaskData[] patterns) {
-        if (args == null || args.length == 0) {
-            logMethod.accept(format, args);
-            return;
-        }
-        
-        Object[] maskedArgs = new Object[args.length];
-        
-        for (int i = 0; i < args.length; i++) {
-            if (i < patterns.length && patterns[i] != null) {
-                maskedArgs[i] = maskArg(args[i], patterns[i]);
-            } else {
-                maskedArgs[i] = mask(args[i]);
-            }
-        }
-        
-        logMethod.accept(format, maskedArgs);
-    }
-    
-    private void logPair(BiConsumer<String, Object[]> logMethod, String format, Object arg1, Object arg2) {
-        Object[] args = new Object[2];
-        args[0] = mask(arg1);
-        args[1] = mask(arg2);
-        logMethod.accept(format, args);
-    }
-    
-    private void logVarargs(BiConsumer<String, Object[]> logMethod, String format, Object... arguments) {
-        logMethod.accept(format, processMaskingArgs(arguments));
-    }
-    
-    private void logMarkerSingle(MarkerLogMethod logMethod, Marker marker, String format, Object arg) {
-        logMethod.log(marker, format, mask(arg));
-    }
-    
-    private void logMarkerPair(MarkerLogArrayMethod logMethod, Marker marker, String format, Object arg1, Object arg2) {
-        Object[] args = new Object[2];
-        args[0] = mask(arg1);
-        args[1] = mask(arg2);
-        logMethod.log(marker, format, args);
-    }
-    
-    private void logMarkerVarargs(MarkerLogArrayMethod logMethod, Marker marker, String format, Object... arguments) {
-        logMethod.log(marker, format, maskArgs(arguments));
     }
 }

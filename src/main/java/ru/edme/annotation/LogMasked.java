@@ -1,4 +1,4 @@
-package ru.edme.aop.logger.annotation;
+package ru.edme.annotation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

@@ -1,7 +1,7 @@
 package ru.edme.model;
 
 import lombok.Data;
-import ru.edme.aop.logger.annotation.SensitiveField;
+import ru.edme.annotation.SensitiveField;
 import ru.edme.pattern.MaskingPattern;
 
 import java.time.LocalDate;

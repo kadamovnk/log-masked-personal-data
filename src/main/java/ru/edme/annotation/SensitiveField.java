@@ -1,4 +1,4 @@
-package ru.edme.aop.logger.annotation;
+package ru.edme.annotation;
 
 import ru.edme.pattern.MaskingPattern;
 

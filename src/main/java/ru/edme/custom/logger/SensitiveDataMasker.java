@@ -1,245 +1,115 @@
 package ru.edme.custom.logger;
 
-import ru.edme.aop.logger.annotation.SensitiveField;
+import ru.edme.annotation.SensitiveField;
 import ru.edme.pattern.MaskingPattern;
 
 import java.lang.reflect.Field;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
+
+import static java.time.format.DateTimeFormatter.ISO_LOCAL_DATE;
 
 public class SensitiveDataMasker {
     private static final Map<Class<?>, Map<String, Field>> SENSITIVE_FIELD_CACHE = new ConcurrentHashMap<>();
     private static final Map<Field, MaskingPattern[]> PATTERN_CACHE = new ConcurrentHashMap<>();
-    private static final DateTimeFormatter ISO_DATE = DateTimeFormatter.ISO_LOCAL_DATE;
     
-    /**
-     * Helper method to mask arguments with no specific pattern
-     */
     public static Object[] maskArgs(Object... args) {
-        if (args == null || args.length == 0) return args;
-        Object[] maskedArgs = new Object[args.length];
-        
-        for (int i = 0; i < args.length; i++) {
-            maskedArgs[i] = mask(args[i]);
-        }
-        
-        return maskedArgs;
-    }
-    
-    /**
-     * Helper method to mask an argument with a specific pattern
-     */
-    public static Object maskArg(Object arg, MaskData maskData) {
-        if (maskData == null) {
-            return mask(arg);
-        }
-        
-        MaskingPattern[] patterns = maskData.patterns();
-        
-        if (patterns.length == 0) {
-            return mask(arg);
-        }
-        
-        if (patterns.length == 1) {
-            return mask(arg, patterns[0]);
-        }
-        
-        return maskWithPatterns(arg, patterns);
-    }
-    
-    /**
-     * Apply specific masking patterns to arguments
-     */
-    public static Object[] maskArgs(Object[] args, MaskData maskData) {
         if (args == null || args.length == 0) {
             return args;
         }
         
         Object[] maskedArgs = new Object[args.length];
-        maskedArgs[0] = maskArg(args[0], maskData);
-        
-        for (int i = 1; i < args.length; i++) {
+        for (int i = 0; i < args.length; i++) {
             maskedArgs[i] = mask(args[i]);
         }
-        
         return maskedArgs;
     }
     
-    /**
-     * Process arguments, extracting MaskData if present
-     */
-    public static Object[] processMaskingArgs(Object[] arguments) {
-        if (arguments == null || arguments.length == 0) {
-            return arguments;
-        }
-        
-        if (arguments[arguments.length - 1] instanceof MaskData maskData) {
-            Object[] actualArgs = new Object[arguments.length - 1];
-            System.arraycopy(arguments, 0, actualArgs, 0, actualArgs.length);
-            return maskArgs(actualArgs, maskData);
-        }
-        
-        return maskArgs(arguments);
-    }
-    
-    /**
-     * Main method to mask any object or value
-     */
     public static Object mask(Object obj) {
         if (obj == null) {
-            return "null";
+            return null;
         }
         
+        if (obj instanceof MaskArg maskArg) {
+            return maskWithPatterns(maskArg.value(), maskArg.maskData() != null ? maskArg.maskData().patterns() : new MaskingPattern[0]);
+        }
         if (obj instanceof LocalDate date) {
-            return maskLocalDate(date, MaskingPattern.DATE_YYYY_MM_DD);
+            return date.toString();
         }
-        
         if (obj instanceof String value) {
-            return maskString(value);
+            return value;
         }
-        
         return maskObject(obj);
     }
     
-    /**
-     * Mask a value with a specific pattern
-     */
     public static Object mask(Object obj, MaskingPattern pattern) {
         if (obj == null) {
-            return "null";
+            return null;
         }
         
         if (obj instanceof LocalDate date) {
-            return maskLocalDate(date, pattern);
+            return pattern.applyTo(date.format(ISO_LOCAL_DATE));
         }
-        
         if (obj instanceof String value) {
             return pattern.applyTo(value);
         }
-        
         return mask(obj);
     }
     
-    /**
-     * Smart string masking - using pattern detection
-     */
-    private static String maskString(String value) {
-        if (value == null || value.length() < 3) {
-            return value;
-        }
-        
-        if (MaskingPattern.EMAIL.getCompiledPattern().matcher(value).matches()) {
-            return MaskingPattern.EMAIL.applyTo(value);
-        }
-        
-        return "***";
-    }
-    
-    /**
-     * Central method for masking with multiple patterns
-     */
     public static Object maskWithPatterns(Object obj, MaskingPattern[] patterns) {
-        if (obj == null) {
-            return "null";
-        }
-        
-        if (patterns == null || patterns.length == 0) {
-            return mask(obj);
-        }
-        
-        for (MaskingPattern pattern : patterns) {
-            if (pattern == MaskingPattern.NO_MASK) {
-                return obj.toString();
-            }
-        }
-        
-        if (patterns.length == 1) {
-            return mask(obj, patterns[0]);
-        }
-        
-        if (obj instanceof String result) {
-            for (MaskingPattern pattern : patterns) {
-                result = pattern.applyTo(result);
-            }
+        if (obj == null || patterns == null || patterns.length == 0) return mask(obj);
+        if (obj instanceof String str) {
+            String result = str;
+            for (MaskingPattern pattern : patterns) result = pattern.applyTo(result);
             return result;
-        } else if (obj instanceof LocalDate date) {
-            for (MaskingPattern pattern : patterns) {
-                if (pattern == MaskingPattern.DATE_YYYY_MM_DD) {
-                    return maskLocalDate(date, pattern);
-                }
-            }
-            return maskLocalDate(date, MaskingPattern.DATE_YYYY_MM_DD);
-        } else {
-            return mask(obj, patterns[0]);
         }
+        if (obj instanceof LocalDate date) {
+            String result = date.format(ISO_LOCAL_DATE);
+            for (MaskingPattern pattern : patterns) result = pattern.applyTo(result);
+            return result;
+        }
+        return mask(obj, patterns[0]);
     }
     
-    /**
-     * Masks an object by inspecting its fields for @SensitiveField annotations
-     */
     private static String maskObject(Object obj) {
         Class<?> clazz = obj.getClass();
         Map<String, Field> sensitiveFields = getSensitiveFields(clazz);
-        
-        if (sensitiveFields.isEmpty()) {
-            return obj.toString();
-        }
-        
-        return buildMaskedObjectString(obj, clazz, sensitiveFields);
-    }
-    
-    /**
-     * Builds a string representation of the object with masked sensitive fields
-     */
-    private static String buildMaskedObjectString(Object obj, Class<?> clazz, Map<String, Field> sensitiveFields) {
-        StringBuilder result = new StringBuilder(clazz.getSimpleName() + "{");
         Field[] fields = clazz.getDeclaredFields();
+        if (fields.length == 0) return obj.toString();
+        StringBuilder result = new StringBuilder(clazz.getSimpleName()).append("{");
         boolean first = true;
-        
         for (Field field : fields) {
-            String formattedField = formatField(obj, field, sensitiveFields);
-            if (formattedField != null) {
-                if (!first) {
-                    result.append(", ");
-                }
-                result.append(formattedField);
+            field.setAccessible(true);
+            try {
+                Object value = field.get(obj);
+                String fieldName = field.getName();
+                String maskedValue = getMaskedFieldValue(field, value, sensitiveFields);
+                appendField(result, fieldName, maskedValue, first);
                 first = false;
-            }
+            } catch (Exception ignored) {}
         }
-        
         result.append("}");
         return result.toString();
     }
     
-    /**
-     * Formats a single field for the masked object string
-     */
-    private static String formatField(Object obj, Field field, Map<String, Field> sensitiveFields) {
-        try {
-            field.setAccessible(true);
-            String fieldName = field.getName();
-            Object value = field.get(obj);
-            
-            if (sensitiveFields.containsKey(fieldName)) {
-                return fieldName + "=" + maskFieldValue(field, value);
-            } else if (shouldRecursivelyMask(value)) {
-                return fieldName + "=" + maskObject(value);
-            } else {
-                return fieldName + "=" + value;
-            }
-        } catch (Exception e) {
-            return null;
+    private static String getMaskedFieldValue(Field field, Object value, Map<String, Field> sensitiveFields) {
+        String fieldName = field.getName();
+        if (sensitiveFields.containsKey(fieldName)) {
+            return maskFieldValue(field, value);
+        } else if (shouldRecursivelyMask(value)) {
+            return maskObject(value);
+        } else {
+            return String.valueOf(value);
         }
     }
     
-    /**
-     * Determines if a field value should be recursively masked
-     */
+    private static void appendField(StringBuilder sb, String fieldName, String maskedValue, boolean isFirst) {
+        if (!isFirst) sb.append(", ");
+        sb.append(fieldName).append("=").append(maskedValue);
+    }
+    
     private static boolean shouldRecursivelyMask(Object value) {
         return value != null &&
                 !isSimpleType(value) &&
@@ -247,37 +117,32 @@ public class SensitiveDataMasker {
                 !value.getClass().getPackageName().startsWith("java.");
     }
     
-    /**
-     *  Masking LocalDate objects
-     */
-    private static String maskLocalDate(LocalDate date, MaskingPattern pattern) {
-        String formatted = date.format(ISO_DATE);
-        return pattern.applyTo(formatted);
-    }
-    
     private static Map<String, Field> getSensitiveFields(Class<?> clazz) {
-        return SENSITIVE_FIELD_CACHE.computeIfAbsent(clazz, cls -> Arrays.stream(cls.getDeclaredFields())
-                .filter(field -> field.isAnnotationPresent(SensitiveField.class))
-                .collect(Collectors.toMap(
-                        Field::getName,
-                        field -> {
-                            field.setAccessible(true);
-                            return field;
-                        }
-                )));
+        return SENSITIVE_FIELD_CACHE.computeIfAbsent(clazz, cls -> {
+            Map<String, Field> map = new ConcurrentHashMap<>();
+            for (Field field : cls.getDeclaredFields()) {
+                if (field.isAnnotationPresent(SensitiveField.class)) {
+                    field.setAccessible(true);
+                    map.put(field.getName(), field);
+                }
+            }
+            return map;
+        });
     }
     
     private static String maskFieldValue(Field field, Object value) {
-        if (value == null) return "null";
+        if (value == null) {
+            return null;
+        }
         
         MaskingPattern[] patterns = getPatterns(field);
-        
         if (patterns.length == 0) {
-            String stringValue = value.toString();
-            return "*".repeat(Math.min(stringValue.length(), 5));
-        } else {
-            return maskWithPatterns(value, patterns).toString();
+            if (value instanceof LocalDate date) {
+                return date.toString();
+            }
+            return value.toString();
         }
+        return maskWithPatterns(value, patterns).toString();
     }
     
     private static MaskingPattern[] getPatterns(Field field) {
@@ -290,21 +155,16 @@ public class SensitiveDataMasker {
     }
     
     private static boolean isSimpleType(Object obj) {
-        if (obj == null) return true;
+        if (obj == null) {
+            return true;
+        }
         
         Class<?> clazz = obj.getClass();
         return clazz.isPrimitive() || SIMPLE_TYPES.contains(clazz);
     }
     
     private static final Set<Class<?>> SIMPLE_TYPES = Set.of(
-            String.class,
-            Boolean.class,
-            Character.class,
-            Byte.class,
-            Short.class,
-            Integer.class,
-            Long.class,
-            Float.class,
-            Double.class
+            String.class, Boolean.class, Character.class, Byte.class, Short.class,
+            Integer.class, Long.class, Float.class, Double.class
     );
 }

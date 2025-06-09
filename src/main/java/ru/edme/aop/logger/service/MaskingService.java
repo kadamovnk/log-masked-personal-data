@@ -3,7 +3,7 @@ package ru.edme.aop.logger.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ReflectionUtils;
-import ru.edme.aop.logger.annotation.SensitiveField;
+import ru.edme.annotation.SensitiveField;
 import ru.edme.pattern.MaskingPattern;
 import ru.edme.aop.logger.strategy.MaskingStrategy;
 import ru.edme.aop.logger.strategy.MaskingStrategyRegistry;

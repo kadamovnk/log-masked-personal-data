@@ -13,7 +13,7 @@ import ru.edme.aop.logger.service.MaskingService;
 public class LogMaskingAspect {
     private final MaskingService maskingService;
     
-    @Around("@annotation(ru.edme.aop.logger.annotation.LogMasked)")
+    @Around("@annotation(ru.edme.annotation.LogMasked)")
     public Object maskMethodArgs(ProceedingJoinPoint joinPoint) throws Throwable {
         Object[] args = joinPoint.getArgs();
         

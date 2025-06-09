@@ -5,12 +5,12 @@ import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.util.regex.Pattern.CASE_INSENSITIVE;
 import static java.util.regex.Pattern.UNICODE_CASE;
+import static java.util.regex.Pattern.CASE_INSENSITIVE;
 import static java.util.regex.Pattern.compile;
 
 public enum MaskingPattern {
-    NO_MASK("(.*)", "$1"),
+    MASK("(.*)", matchResult -> "*****"),
     EMAIL("([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\\.[a-zA-Z0-9.-]+)", "***@$2"),
     PHONE("(\\+7\\(\\d{3}\\))\\d{3}-\\d{2}-(\\d{2})", "$1***-**-$2"),
     SNILS("(\\d{3})-\\d{3}-\\d{3}-\\d{2}", "$1-***-***-**"),
@@ -60,10 +60,6 @@ public enum MaskingPattern {
         this.regex = regex;
         this.replacement = replacement;
         this.compiledPattern = compile(regex);
-    }
-    
-    public Pattern getCompiledPattern() {
-        return compiledPattern;
     }
     
     @SuppressWarnings("unchecked")
