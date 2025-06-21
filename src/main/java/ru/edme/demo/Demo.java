@@ -3,6 +3,7 @@ package ru.edme.demo;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
+import ru.edme.model.Address;
 import ru.edme.model.Person;
 
 import java.time.LocalDate;
@@ -15,6 +16,7 @@ public class Demo {
     @PostConstruct
     public void build() {
         Person person = new Person();
+        Address address = new Address();
         person.setFirstName("Галина");
         person.setLastName("Искрева");
         person.setMiddleName("Петровна");
@@ -31,6 +33,10 @@ public class Demo {
         person.setInn("607080901000");
         person.setSnils("314-565-256-20");
         person.setStringDate("2023-10-20 12:00:00, 10.10.2022, 10-10-2020, 2021.10.10");
+        address.setApartment("д. 4");
+        address.setHouse("кв. 22");
+        address.setStreet("ул. Ленина");
+        person.setAddresss(address);
         
         logging.log(person);
         

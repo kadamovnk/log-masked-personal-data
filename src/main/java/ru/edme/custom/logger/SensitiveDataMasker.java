@@ -1,60 +1,58 @@
 package ru.edme.custom.logger;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import org.slf4j.Logger;
 import ru.edme.annotation.SensitiveField;
+import ru.edme.annotation.SensitiveObject;
 import ru.edme.pattern.MaskingPattern;
 
 import java.lang.reflect.Field;
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static com.github.benmanes.caffeine.cache.Caffeine.newBuilder;
+import static java.lang.System.identityHashCode;
+import static java.lang.ThreadLocal.withInitial;
 import static java.time.format.DateTimeFormatter.ISO_LOCAL_DATE;
+import static java.util.Set.of;
+import static java.util.concurrent.TimeUnit.HOURS;
 
 public class SensitiveDataMasker {
-    private static final Map<Class<?>, Map<String, Field>> SENSITIVE_FIELD_CACHE = new ConcurrentHashMap<>();
-    private static final Map<Field, MaskingPattern[]> PATTERN_CACHE = new ConcurrentHashMap<>();
-    
-    public static Object[] maskArgs(Object... args) {
-        if (args == null || args.length == 0) {
-            return args;
-        }
-        
-        Object[] maskedArgs = new Object[args.length];
-        for (int i = 0; i < args.length; i++) {
-            maskedArgs[i] = mask(args[i]);
-        }
-        return maskedArgs;
-    }
+    private static final ThreadLocal<Set<Integer>> VISITED = withInitial(HashSet::new);
+    private static final Cache<Class<?>, Map<String, Field>> SENSITIVE_FIELD_CACHE =
+            newBuilder()
+                    .maximumSize(1000)
+                    .expireAfterAccess(1, HOURS)
+                    .build();
+    private static final Cache<Field, MaskingPattern[]> PATTERN_CACHE =
+            newBuilder()
+                    .maximumSize(2000)
+                    .build();
+    private static final Set<Class<?>> SIMPLE_TYPES = of(
+            String.class, Boolean.class, Character.class, Byte.class, Short.class,
+            Integer.class, Long.class, Float.class, Double.class
+    );
     
     public static Object mask(Object obj) {
-        if (obj == null) {
-            return null;
+        try {
+            if (obj == null) return null;
+            if (obj instanceof Mask mask) return maskWithPatterns(mask.args(), mask.patterns());
+            if (isSimpleType(obj)) return obj;
+            if (obj instanceof LocalDate date) return date.toString();
+            return maskObject(obj);
+        } catch (Exception e) {
+            return "[complex object]";
         }
-        
-        if (obj instanceof MaskArg maskArg) {
-            return maskWithPatterns(maskArg.value(), maskArg.maskData() != null ? maskArg.maskData().patterns() : new MaskingPattern[0]);
-        }
-        if (obj instanceof LocalDate date) {
-            return date.toString();
-        }
-        if (obj instanceof String value) {
-            return value;
-        }
-        return maskObject(obj);
     }
     
     public static Object mask(Object obj, MaskingPattern pattern) {
-        if (obj == null) {
-            return null;
-        }
-        
-        if (obj instanceof LocalDate date) {
-            return pattern.applyTo(date.format(ISO_LOCAL_DATE));
-        }
-        if (obj instanceof String value) {
-            return pattern.applyTo(value);
-        }
+        if (obj == null) return null;
+        if (obj instanceof LocalDate date) return pattern.applyTo(date.format(ISO_LOCAL_DATE));
+        if (obj instanceof String value) return pattern.applyTo(value);
         return mask(obj);
     }
     
@@ -74,34 +72,56 @@ public class SensitiveDataMasker {
     }
     
     private static String maskObject(Object obj) {
-        Class<?> clazz = obj.getClass();
-        Map<String, Field> sensitiveFields = getSensitiveFields(clazz);
-        Field[] fields = clazz.getDeclaredFields();
-        if (fields.length == 0) return obj.toString();
-        StringBuilder result = new StringBuilder(clazz.getSimpleName()).append("{");
-        boolean first = true;
-        for (Field field : fields) {
-            field.setAccessible(true);
-            try {
-                Object value = field.get(obj);
-                String fieldName = field.getName();
-                String maskedValue = getMaskedFieldValue(field, value, sensitiveFields);
-                appendField(result, fieldName, maskedValue, first);
-                first = false;
-            } catch (Exception ignored) {}
+        try {
+            VISITED.get().clear();
+            return maskObject(obj, VISITED.get());
+        } finally {
+            VISITED.get().clear();
         }
-        result.append("}");
-        return result.toString();
     }
     
-    private static String getMaskedFieldValue(Field field, Object value, Map<String, Field> sensitiveFields) {
-        String fieldName = field.getName();
-        if (sensitiveFields.containsKey(fieldName)) {
+    private static String maskObject(Object obj, Set<Integer> visited) {
+        if (obj == null) return "null";
+        int identity = identityHashCode(obj);
+        if (!visited.add(identity)) {
+            return "[circular-ref]";
+        }
+        try {
+            Class<?> clazz = obj.getClass();
+            if (!clazz.isAnnotationPresent(SensitiveObject.class)) {
+                return safeToString(obj);
+            }
+            Map<String, Field> sensitiveFields = getSensitiveFields(clazz);
+            Field[] fields = clazz.getDeclaredFields();
+            if (fields.length == 0) return safeToString(obj);
+            StringBuilder result = new StringBuilder(clazz.getSimpleName()).append("{");
+            boolean first = true;
+            for (Field field : fields) {
+                field.setAccessible(true);
+                try {
+                    Object value = field.get(obj);
+                    String maskedValue = maskField(field, value, sensitiveFields, visited);
+                    appendField(result, field.getName(), maskedValue, first);
+                    first = false;
+                } catch (Exception e) {
+                    appendField(result, field.getName(), "[access-error]", first);
+                    first = false;
+                }
+            }
+            result.append("}");
+            return result.toString();
+        } finally {
+            visited.remove(identity);
+        }
+    }
+    
+    private static String maskField(Field field, Object value, Map<String, Field> sensitiveFields, Set<Integer> visited) {
+        if (sensitiveFields.containsKey(field.getName())) {
             return maskFieldValue(field, value);
         } else if (shouldRecursivelyMask(value)) {
-            return maskObject(value);
+            return maskObject(value, visited);
         } else {
-            return String.valueOf(value);
+            return safeToString(value);
         }
     }
     
@@ -111,14 +131,18 @@ public class SensitiveDataMasker {
     }
     
     private static boolean shouldRecursivelyMask(Object value) {
-        return value != null &&
-                !isSimpleType(value) &&
-                !value.getClass().isEnum() &&
-                !value.getClass().getPackageName().startsWith("java.");
+        if (value == null) return false;
+        Class<?> clazz = value.getClass();
+        if (isSimpleType(value) || clazz.isEnum() || clazz.isArray()) return false;
+        if (Collection.class.isAssignableFrom(clazz)) return false;
+        if (Map.class.isAssignableFrom(clazz)) return false;
+        if (clazz.getPackageName().startsWith("java.") || clazz.getPackageName().startsWith("javax.")) return false;
+        if (Logger.class.isAssignableFrom(clazz)) return false;
+        return true;
     }
     
     private static Map<String, Field> getSensitiveFields(Class<?> clazz) {
-        return SENSITIVE_FIELD_CACHE.computeIfAbsent(clazz, cls -> {
+        return SENSITIVE_FIELD_CACHE.get(clazz, cls -> {
             Map<String, Field> map = new ConcurrentHashMap<>();
             for (Field field : cls.getDeclaredFields()) {
                 if (field.isAnnotationPresent(SensitiveField.class)) {
@@ -131,40 +155,36 @@ public class SensitiveDataMasker {
     }
     
     private static String maskFieldValue(Field field, Object value) {
-        if (value == null) {
-            return null;
-        }
-        
+        if (value == null) return null;
         MaskingPattern[] patterns = getPatterns(field);
         if (patterns.length == 0) {
-            if (value instanceof LocalDate date) {
-                return date.toString();
-            }
-            return value.toString();
+            if (value instanceof LocalDate date) return date.toString();
+            return safeToString(value);
         }
         return maskWithPatterns(value, patterns).toString();
     }
     
     private static MaskingPattern[] getPatterns(Field field) {
-        return PATTERN_CACHE.computeIfAbsent(field, f -> {
+        return PATTERN_CACHE.get(field, f -> {
             SensitiveField annotation = f.getAnnotation(SensitiveField.class);
-            assert annotation != null;
-            MaskingPattern[] patterns = annotation.patterns();
-            return patterns.length > 0 ? patterns : new MaskingPattern[0];
+            return annotation != null && annotation.patterns().length > 0
+                    ? annotation.patterns()
+                    : new MaskingPattern[0];
         });
     }
     
     private static boolean isSimpleType(Object obj) {
-        if (obj == null) {
-            return true;
-        }
-        
+        if (obj == null) return true;
         Class<?> clazz = obj.getClass();
         return clazz.isPrimitive() || SIMPLE_TYPES.contains(clazz);
     }
     
-    private static final Set<Class<?>> SIMPLE_TYPES = Set.of(
-            String.class, Boolean.class, Character.class, Byte.class, Short.class,
-            Integer.class, Long.class, Float.class, Double.class
-    );
+    private static String safeToString(Object obj) {
+        if (obj == null) return "null";
+        try {
+            return obj.toString();
+        } catch (Exception e) {
+            return "[unprintable:" + obj.getClass().getSimpleName() + "]";
+        }
+    }
 }

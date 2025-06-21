@@ -2,12 +2,15 @@ package ru.edme.model;
 
 import lombok.Data;
 import ru.edme.annotation.SensitiveField;
+import ru.edme.annotation.SensitiveObject;
 import ru.edme.pattern.MaskingPattern;
 
 import java.time.LocalDate;
 
 @Data
+@SensitiveObject
 public class Person {
+    private Address addresss;
     
     @SensitiveField(patterns = MaskingPattern.FULL_NAME)
     private String firstName;

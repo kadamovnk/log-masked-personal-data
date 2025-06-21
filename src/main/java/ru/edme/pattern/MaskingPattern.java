@@ -62,15 +62,13 @@ public enum MaskingPattern {
         this.compiledPattern = compile(regex);
     }
     
-    @SuppressWarnings("unchecked")
     public String applyTo(String input) {
         if (input == null) return null;
-        
         if (replacement instanceof String stringReplacement) {
             return compiledPattern.matcher(input).replaceAll(stringReplacement);
         } else {
             return compiledPattern.matcher(input)
-                    .replaceAll((Function<MatchResult, String>)replacement);
+                    .replaceAll((Function<MatchResult, String>) replacement);
         }
     }
 }

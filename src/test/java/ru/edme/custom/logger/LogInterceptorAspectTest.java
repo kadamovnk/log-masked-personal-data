@@ -1,48 +1,51 @@
 package ru.edme.custom.logger;
 
-import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import ru.edme.model.Person;
-import ru.edme.pattern.MaskingPattern;
 
 import java.io.InputStream;
-import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static ru.edme.custom.logger.MaskArg.value;
-import static ru.edme.custom.logger.MaskData.pattern;
+import static ru.edme.custom.logger.Mask.sensitive;
+import static ru.edme.pattern.MaskingPattern.ADDRESS;
+import static ru.edme.pattern.MaskingPattern.EMAIL;
+import static ru.edme.pattern.MaskingPattern.FULL_NAME;
+import static ru.edme.pattern.MaskingPattern.MASK;
+import static ru.edme.pattern.MaskingPattern.PHONE;
+import static ru.edme.pattern.MaskingPattern.POSTAL_CODE;
 
-public class SensitiveDataLoggerTest {
-    private SensitiveDataLogger sensitiveLogger;
+@Slf4j
+public class LogInterceptorAspectTest {
     private ListAppender<ILoggingEvent> listAppender;
     private Person testPerson;
 
     @BeforeEach
     public void setUp() throws Exception {
-        Logger rootLogger = (Logger) LoggerFactory.getLogger(SensitiveDataLoggerTest.class);
+        Logger rootLogger = (Logger) LoggerFactory.getLogger(LogInterceptorAspectTest.class);
         listAppender = new ListAppender<>();
         listAppender.start();
         rootLogger.addAppender(listAppender);
-        sensitiveLogger = SensitiveDataLoggerFactory.getLogger(SensitiveDataLoggerTest.class);
-
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
         try (InputStream inputStream = getClass().getResourceAsStream("/test-person.json")) {
+            if (inputStream == null) {
+                throw new IllegalStateException("Resource '/test-person.json' not found in test resources.");
+            }
             testPerson = objectMapper.readValue(inputStream, Person.class);
         }
     }
 
     @Test
     public void testAnnotationBasedMasking() {
-        sensitiveLogger.info("Person: {}", testPerson);
+        log.info("Person: {}", testPerson);
         String msg = listAppender.list.get(0).getFormattedMessage();
         assertTrue(msg.contains("firstName=***"));
         assertTrue(msg.contains("email=***@mail.ru"));
@@ -56,15 +59,15 @@ public class SensitiveDataLoggerTest {
 
     @Test
     public void testExplicitMaskArg() {
-        sensitiveLogger.info("First Name: {}", value(testPerson.getFirstName(), pattern(MaskingPattern.FULL_NAME)));
+        log.info("First Name: {}", sensitive(testPerson.getFirstName(), FULL_NAME));
         String msg = listAppender.list.get(0).getFormattedMessage();
         assertTrue(msg.contains("***"));
     }
 
     @Test
-    public void testNoMaskPattern() {
+    public void testNoPattern() {
         String email = testPerson.getEmail();
-        sensitiveLogger.info("Unmasked: {}", value(email, null));
+        log.info("Unmasked: {}", sensitive(email));
         String msg = listAppender.list.get(0).getFormattedMessage();
         assertTrue(msg.contains(email));
     }
@@ -72,41 +75,19 @@ public class SensitiveDataLoggerTest {
     @Test
     public void testMultiplePatterns() {
         String address = testPerson.getAddress();
-        sensitiveLogger.info("Address: {}", value(address, pattern(MaskingPattern.POSTAL_CODE, MaskingPattern.ADDRESS)));
+        log.info("Address: {}", sensitive(address, POSTAL_CODE, ADDRESS));
         String msg = listAppender.list.get(0).getFormattedMessage();
         assertTrue(msg.contains("******"));
         assertTrue(msg.contains("*** р-н"));
     }
 
     @Test
-    public void testAllLogLevels() {
-        sensitiveLogger.info("Info: {}", testPerson.getEmail());
-        sensitiveLogger.warn("Warn: {}", testPerson.getPhone());
-        sensitiveLogger.error("Error: {}", testPerson.getSnils());
-
-        List<ILoggingEvent> events = listAppender.list;
-        assertEquals(Level.INFO, events.get(0).getLevel());
-        assertEquals(Level.WARN, events.get(1).getLevel());
-        assertEquals(Level.ERROR, events.get(2).getLevel());
-    }
-
-    @Test
-    public void testNullAndEmptyValues() {
-        sensitiveLogger.info("Null: {}", (Object) null);
-        sensitiveLogger.info("Empty: {}", "");
-        String msgNull = listAppender.list.get(0).getFormattedMessage();
-        String msgEmpty = listAppender.list.get(1).getFormattedMessage();
-        assertTrue(msgNull.contains("Null: null"));
-        assertTrue(msgEmpty.contains("Empty: "));
-    }
-
-    @Test
-    public void testMoreArgsThanPatterns() {
-        sensitiveLogger.info("id={}, email={}, phone={}, info={}",
-                value("12345", pattern(MaskingPattern.MASK)),
-                value(testPerson.getEmail(), pattern(MaskingPattern.EMAIL)),
-                value(testPerson.getPhone(), pattern(MaskingPattern.PHONE)),
-                value("Additional info", null)
+    public void testMultipleArgs() {
+        log.info("id={}, email={}, phone={}, info={}",
+                sensitive("12345", MASK),
+                sensitive(testPerson.getEmail(), EMAIL),
+                sensitive(testPerson.getPhone(), PHONE),
+                sensitive("Additional info")
         );
         String msg = listAppender.list.get(0).getFormattedMessage();
         assertTrue(msg.contains("id=***"));
